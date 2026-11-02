@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: pennypath
+      POSTGRES_USER: pennypath
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pennypath}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pennypath"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    environment:
+      ConnectionStrings__Default: Host=db;Database=pennypath;Username=pennypath;Password=${POSTGRES_PASSWORD:-pennypath}
+      Cors__Origins__0: http://localhost:8080
+      Jwt__Key: ${JWT_KEY:-compose-dev-only-key-change-in-real-use-0123456789}
+      Database__MigrateOnStartup: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "5000:8080"
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:5000
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:
