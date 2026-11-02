@@ -4,7 +4,7 @@ public record RegisterRequest(string Email, string Password);
 public record LoginRequest(string Email, string Password);
 public record AuthResponse(string Token, DateTime ExpiresAt, string Email);
 
-public enum AuthError { None, InvalidInput, EmailTaken, InvalidCredentials }
+public enum AuthError { None, InvalidInput, EmailTaken, InvalidCredentials, LockedOut }
 
 public record AuthResult(AuthResponse? Response, AuthError Error, string? Message = null)
 {

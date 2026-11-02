@@ -1,14 +1,17 @@
+# Secrets come from .env (copy .env.example). They are required: no insecure defaults.
 services:
   db:
     image: postgres:17-alpine
     environment:
       POSTGRES_DB: pennypath
       POSTGRES_USER: pennypath
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pennypath}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432" # loopback only: not reachable from other machines
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pennypath"]
       interval: 5s
@@ -17,25 +20,38 @@ services:
   api:
     build: ./backend
     environment:
-      ConnectionStrings__Default: Host=db;Database=pennypath;Username=pennypath;Password=${POSTGRES_PASSWORD:-pennypath}
+      ConnectionStrings__Default: Host=db;Database=pennypath;Username=pennypath;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       Cors__Origins__0: http://localhost:8080
-      Jwt__Key: ${JWT_KEY:-compose-dev-only-key-change-in-real-use-0123456789}
+      Jwt__Key: ${JWT_KEY:?Set JWT_KEY in .env (at least 32 random bytes)}
       Database__MigrateOnStartup: "true"
     depends_on:
       db:
         condition: service_healthy
     ports:
-      - "5000:8080"
+      - "127.0.0.1:5000:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
   web:
     build:
       context: ./frontend
       args:
         VITE_API_URL: http://localhost:5000
+    environment:
+      API_ORIGIN: http://localhost:5000
     depends_on:
       - api
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:8080"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   pgdata:

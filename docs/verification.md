@@ -59,3 +59,15 @@ Last updated: 2026-11-02
 - Rule-based only; there is no Claude fallback for unrecognised formats yet, and no categories (everything is "Uncategorized", M5).
 - Amounts are assumed to be INR (Rs, INR or the rupee sign).
 - The `AddTransactionImportFields` migration changes the `Type` column from int to text and adds a non-null `UserId`. It is safe only because no transaction rows existed. Future migrations must be written with real data in mind.
+
+## Security hardening (2026-11-02): see docs/security.md
+
+| Check | Status | Notes |
+|---|---|---|
+| Backend tests | 47 pass | Adds lockout, lockout expiry, weak/oversized passwords, `alg:none` token, security headers, body size limit |
+| Dependency audit | Clean | `dotnet list package --vulnerable --include-transitive` and `npm audit`: no findings |
+| Live checks on compose | Verified | Headers on API and web, CSP, non-root users, loopback-only ports, lockout (5 failures then 429, even for the right password), CORS refuses unknown origin, OpenAPI 404, compose fails without secrets |
+| CodeQL, Dependabot, new CI audit steps | Not yet run | Take effect after the next push; CodeQL needs code scanning available for the repo |
+| Browser behaviour under the CSP | Not verified | Only same-origin scripts/styles are in the page, so it should work, but it was not opened in a real browser |
+
+Breaking change for local setup: copy `.env.example` to `.env` and fill in `POSTGRES_PASSWORD` and `JWT_KEY` before `docker compose up`.

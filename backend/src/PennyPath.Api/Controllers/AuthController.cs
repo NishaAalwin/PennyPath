@@ -33,6 +33,7 @@ public class AuthController(IAuthService auth) : ControllerBase
         AuthError.None => created ? StatusCode(StatusCodes.Status201Created, r.Response) : Ok(r.Response),
         AuthError.InvalidInput => BadRequest(new { error = r.Message }),
         AuthError.EmailTaken => Conflict(new { error = r.Message }),
+        AuthError.LockedOut => StatusCode(StatusCodes.Status429TooManyRequests, new { error = r.Message }),
         _ => Unauthorized(new { error = r.Message }),
     };
 }

@@ -46,6 +46,42 @@ public class AuthEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Responses_carry_security_headers_and_no_server_banner()
+    {
+        var res = await factory.CreateClient().GetAsync("/api/auth/me");
+
+        Assert.Equal("nosniff", res.Headers.GetValues("X-Content-Type-Options").Single());
+        Assert.Equal("DENY", res.Headers.GetValues("X-Frame-Options").Single());
+        Assert.Equal("no-store", res.Headers.GetValues("Cache-Control").Single());
+        Assert.Contains("default-src 'none'", res.Headers.GetValues("Content-Security-Policy").Single());
+        Assert.False(res.Headers.Contains("Server"));
+    }
+
+    [Fact]
+    public async Task Unsigned_none_algorithm_token_is_rejected()
+    {
+        static string B64(string s) => Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(s)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var exp = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
+        var none = $"{B64("{\"alg\":\"none\",\"typ\":\"JWT\"}")}.{B64($"{{\"sub\":\"{Guid.NewGuid()}\",\"iss\":\"PennyPath\",\"aud\":\"PennyPath\",\"exp\":{exp}}}")}.";
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", none);
+
+        var res = await client.GetAsync("/api/auth/me");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Oversized_request_body_is_rejected()
+    {
+        var big = new StringContent(new string('a', 1_100_000), System.Text.Encoding.UTF8, "application/json");
+
+        var res = await factory.CreateClient().PostAsync("/api/auth/login", big);
+
+        Assert.True(res.StatusCode is HttpStatusCode.RequestEntityTooLarge or HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task Me_with_token_signed_by_another_key_is_unauthorized()
     {
         var forged = new JwtTokenService(Options.Create(new JwtOptions { Key = new string('x', 40) }))
