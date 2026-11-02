@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -15,6 +16,18 @@ public class AuthEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
     public async Task Me_without_token_is_unauthorized()
     {
         var res = await factory.CreateClient().GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("GET", "/api/transactions")]
+    [InlineData("POST", "/api/sms/import")]
+    public async Task Transaction_endpoints_require_authentication(string method, string url)
+    {
+        var res = await factory.CreateClient().SendAsync(new HttpRequestMessage(new HttpMethod(method), url)
+        {
+            Content = method == "POST" ? JsonContent.Create(new { messages = new[] { "x" } }) : null,
+        });
         Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
     }
 

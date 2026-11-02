@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getHealth, getMe, type Health } from './api'
 import AuthForm from './AuthForm'
+import TransactionsPanel from './TransactionsPanel'
 import { clearToken, loadToken, saveToken } from './session'
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
         <section>
           <p>Signed in as <strong>{email ?? '...'}</strong></p>
           <button onClick={logout}>Log out</button>
+          <TransactionsPanel token={token} onSessionExpired={logout} />
         </section>
       ) : (
         <AuthForm onAuthenticated={onAuthenticated} />

@@ -23,6 +23,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasKey(t => t.Id);
             e.Property(t => t.Amount).HasPrecision(18, 2);
             e.Property(t => t.Merchant).HasMaxLength(200);
+            e.Property(t => t.Category).HasMaxLength(100);
+            e.Property(t => t.Account).HasMaxLength(20);
+            e.Property(t => t.RawHash).HasMaxLength(64).IsRequired();
+            e.Property(t => t.Type).HasConversion<string>().HasMaxLength(10);
+            e.Property(t => t.Source).HasConversion<string>().HasMaxLength(10);
+            e.HasOne<User>().WithMany().HasForeignKey(t => t.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(t => new { t.UserId, t.RawHash }).IsUnique();
+            e.HasIndex(t => new { t.UserId, t.Date });
         });
     }
 }

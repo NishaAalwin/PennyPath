@@ -41,3 +41,21 @@ Last updated: 2026-11-02
 - No refresh tokens, email verification or password reset yet. Tokens last 60 minutes.
 - The compose `Jwt__Key` default is dev-only. Set `JWT_KEY` for any real deployment.
 - The first migration is named `AddUsers` but also creates `Transactions`.
+
+## M3 + M4: parser and SMS import (2026-11-02)
+
+| Check | Status | Notes |
+|---|---|---|
+| Parser unit tests (17) | Verified | Amounts, debit/credit, merchant, account, date formats; ignores OTPs, due reminders, declined and promo messages; skips "Avl bal" amounts |
+| Import service tests (6) | Verified | Dedupe on re-import and within one batch, per-user isolation, month filter and ordering |
+| Backend total / frontend total | 37 / 11 tests pass | Frontend lint and build clean (Node 24) |
+| Compose end-to-end (curl) | Verified | Upgrade migration applied to an existing DB; import 3 of 4 (OTP reported as unread), re-import 0 new / 3 duplicates, list, month filter, per-user isolation (second user sees none), 401 without token, 400 for bad month or empty body |
+| Import and transaction table UI in a real browser | Not verified | Same browser limitation as before |
+| Real-world accuracy | **Not measured** | Tested only on hand-written sample messages. The requirement is >= 90% on real bank alerts, so we need a set of real (redacted) messages from the user's banks |
+
+### Known limitations
+- Dedupe uses the normalized message text. Two genuinely different transactions with identical text (no reference or time in the SMS) would collapse into one.
+- A message with no date uses the import date.
+- Rule-based only; there is no Claude fallback for unrecognised formats yet, and no categories (everything is "Uncategorized", M5).
+- Amounts are assumed to be INR (Rs, INR or the rupee sign).
+- The `AddTransactionImportFields` migration changes the `Type` column from int to text and adds a non-null `UserId`. It is safe only because no transaction rows existed. Future migrations must be written with real data in mind.
