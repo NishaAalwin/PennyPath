@@ -9,9 +9,15 @@ export type Transaction = {
   category: string
   account: string | null
   source: string
+  isTransfer: boolean
+  isRefund: boolean
+  refundOfId: string | null
+  duplicateOfId: string | null
 }
 
-export type ImportResult = { imported: number; duplicates: number; unparsed: string[] }
+export type UnparsedMessage = { id: string; text: string; createdAt: string }
+
+export type ImportResult = { imported: number; duplicates: number; unparsed: string[]; possibleDuplicates: number }
 
 type Fetch = typeof fetch
 
@@ -46,3 +52,18 @@ export const listCategories = (token: string, fetchFn: Fetch = fetch) =>
 
 export const setCategory = (token: string, id: string, category: string, fetchFn: Fetch = fetch) =>
   authed<void>(token, `/api/transactions/${id}/category`, { method: 'PUT', body: JSON.stringify({ category }) }, fetchFn)
+
+export const setTransfer = (token: string, id: string, isTransfer: boolean, fetchFn: Fetch = fetch) =>
+  authed<void>(token, `/api/transactions/${id}/transfer`, { method: 'PUT', body: JSON.stringify({ isTransfer }) }, fetchFn)
+
+export const notDuplicate = (token: string, id: string, fetchFn: Fetch = fetch) =>
+  authed<void>(token, `/api/transactions/${id}/not-duplicate`, { method: 'POST' }, fetchFn)
+
+export const deleteTransaction = (token: string, id: string, fetchFn: Fetch = fetch) =>
+  authed<void>(token, `/api/transactions/${id}`, { method: 'DELETE' }, fetchFn)
+
+export const listUnparsed = (token: string, fetchFn: Fetch = fetch) =>
+  authed<UnparsedMessage[]>(token, '/api/review/unparsed', {}, fetchFn)
+
+export const dismissUnparsed = (token: string, id: string, fetchFn: Fetch = fetch) =>
+  authed<void>(token, `/api/review/unparsed/${id}`, { method: 'DELETE' }, fetchFn)

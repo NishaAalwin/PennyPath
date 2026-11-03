@@ -14,6 +14,9 @@ Standing requirement from the user: *the application must be secured from extern
 - [ ] Sensitive data minimised (esp. anything sent to the Claude API)
 - [ ] `docs/security.md` updated, including what is **not** done
 
+## Recorded exceptions
+- **Unparsed SMS text is stored** (M9 needs-review list): ≤ 500 chars each, ≤ 200 per user, user-deletable, deleted with the account (cascade). May contain account digits or balances the user pasted. Must be included in [[M10 Account lifecycle]] deletion and data export, and never sent to the AI.
+
 ## Open items (keep current)
 1. Revoke the GitHub tokens pasted in chat earlier (user action)
 2. GitHub settings: branch protection, secret scanning, Dependabot alerts, private vuln reporting (user action)

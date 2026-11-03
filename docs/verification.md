@@ -87,3 +87,23 @@ Breaking change for local setup: copy `.env.example` to `.env` and fill in `POST
 ### Known limitations
 - Rows imported before this change stay "Uncategorized" (no backfill), and rule changes do not re-categorize old rows.
 - The "Transfers" category exists but nothing assigns it yet (M9).
+
+## M9: data quality (2026-11-03)
+
+| Check | Status | Notes |
+|---|---|---|
+| Backend tests | 117 pass | Adds parser (reference numbers, refund/reversal wording), reconciler rules incl. false-positive guards, service behaviour, per-user isolation, caps, 401 for every new endpoint |
+| Frontend tests, lint, build, `npm audit` | Verified (Node 24) | 14 tests pass; no vulnerabilities |
+| Dependency audit (NuGet) | Clean | No new packages |
+| Compose end-to-end (curl) | Verified | Migration `AddDataQuality` applied on Postgres. Same-reference message flagged as possible duplicate; different reference not flagged; refund linked to its purchase; own-account debit+credit marked as transfer on both rows; unreadable message listed then dismissed; other user gets 404, no token 401 |
+| New UI (badges, actions, needs-review panel) in a real browser | Not verified | Same browser limitation as before |
+| Cross-source (SMS vs email) dedupe | **Not verified** | Email import (M2) does not exist; rules are source-agnostic and tested on SMS |
+| Accuracy of duplicate/transfer/refund rules on real messages | **Not measured** | Needs the real redacted samples from the user |
+
+### Known limitations
+- Same-day, same-merchant, same-amount purchases without a reference number are flagged as possible duplicates (user confirms).
+- Equal debit/credit on two different accounts can be auto-marked a transfer if unambiguous (user can undo).
+- Partial refunds and refunds imported before the purchase are not linked.
+- There is no accounts entity yet; "account" is the last digits found in each message.
+- The dashboard (M6) is not built; it must exclude duplicates and transfers and treat refunds as negative expense (recorded in the brain).
+- Unparsed SMS text is stored (capped, deletable). This is a recorded exception to "no raw bodies stored".

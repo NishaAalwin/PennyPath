@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { importSms, listCategories, listTransactions, setCategory, splitMessages, type ImportResult, type Transaction } from './transactions'
+import {
+  deleteTransaction, dismissUnparsed, importSms, listCategories, listTransactions, listUnparsed, notDuplicate,
+  setCategory, setTransfer, splitMessages, type ImportResult, type Transaction, type UnparsedMessage,
+} from './transactions'
 
 type Props = { token: string; onSessionExpired: () => void }
 
@@ -12,6 +15,7 @@ export default function Transactions({ token, onSessionExpired }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [categories, setCategories] = useState<string[]>([])
+  const [review, setReview] = useState<UnparsedMessage[]>([])
 
   const handleError = useCallback(
     (e: unknown) => {
@@ -22,7 +26,7 @@ export default function Transactions({ token, onSessionExpired }: Props) {
   )
 
   const refresh = useCallback(
-    () => listTransactions(token).then(setRows).catch(handleError),
+    () => Promise.all([listTransactions(token).then(setRows), listUnparsed(token).then(setReview)]).catch(handleError),
     [token, handleError],
   )
 
@@ -31,15 +35,17 @@ export default function Transactions({ token, onSessionExpired }: Props) {
     listCategories(token).then(setCategories).catch(handleError)
   }, [refresh, token, handleError])
 
-  async function changeCategory(id: string, category: string) {
+  async function act(action: () => Promise<unknown>) {
     setError(null)
     try {
-      await setCategory(token, id, category)
+      await action()
       await refresh()
     } catch (e) {
       handleError(e)
     }
   }
+
+  const changeCategory = (id: string, category: string) => act(() => setCategory(token, id, category))
 
   async function submit() {
     const messages = splitMessages(text)
@@ -68,6 +74,7 @@ export default function Transactions({ token, onSessionExpired }: Props) {
       {result && (
         <p style={{ margin: 0 }}>
           Imported {result.imported}, skipped {result.duplicates} already imported
+          {result.possibleDuplicates > 0 && `, ${result.possibleDuplicates} look like duplicates (check below)`}
           {result.unparsed.length > 0 && `, could not read ${result.unparsed.length}`}.
         </p>
       )}
@@ -78,17 +85,31 @@ export default function Transactions({ token, onSessionExpired }: Props) {
         </details>
       )}
 
+      {review.length > 0 && (
+        <>
+          <h2>Needs review ({review.length})</h2>
+          <p style={{ margin: 0 }}>These messages could not be read. Add them by hand or dismiss them; dismissing deletes the saved text.</p>
+          <ul style={{ margin: 0 }}>
+            {review.map((m) => (
+              <li key={m.id}>
+                {m.text} <button onClick={() => act(() => dismissUnparsed(token, m.id))}>Dismiss</button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       <h2>Transactions</h2>
       {rows.length === 0 ? (
         <p>No transactions yet.</p>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr><th align="left">Date</th><th align="left">Merchant</th><th align="left">Category</th><th align="right">Amount</th></tr>
+            <tr><th align="left">Date</th><th align="left">Merchant</th><th align="left">Category</th><th align="left">Status</th><th align="right">Amount</th></tr>
           </thead>
           <tbody>
             {rows.map((t) => (
-              <tr key={t.id}>
+              <tr key={t.id} style={t.duplicateOfId ? { opacity: 0.6 } : undefined}>
                 <td>{t.date}</td>
                 <td>{t.merchant || '-'}</td>
                 <td>
@@ -96,6 +117,23 @@ export default function Transactions({ token, onSessionExpired }: Props) {
                     onChange={(e) => changeCategory(t.id, e.target.value)}>
                     {(categories.length ? categories : [t.category]).map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
+                </td>
+                <td>
+                  {t.duplicateOfId ? (
+                    <>
+                      Possible duplicate{' '}
+                      <button onClick={() => act(() => notDuplicate(token, t.id))}>Not a duplicate</button>{' '}
+                      <button onClick={() => act(() => deleteTransaction(token, t.id))}>Delete</button>
+                    </>
+                  ) : t.isTransfer ? (
+                    <>
+                      Transfer <button onClick={() => act(() => setTransfer(token, t.id, false))}>Not a transfer</button>
+                    </>
+                  ) : t.isRefund ? (
+                    t.refundOfId ? 'Refund' : 'Refund (no matching purchase)'
+                  ) : (
+                    <button onClick={() => act(() => setTransfer(token, t.id, true))}>Mark as transfer</button>
+                  )}
                 </td>
                 <td align="right" style={{ color: t.type === 'Income' ? '#1b7f3b' : undefined }}>
                   {t.type === 'Income' ? '+' : '-'}{inr.format(t.amount)}

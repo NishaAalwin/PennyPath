@@ -2,6 +2,14 @@
 
 Newest first. One entry per task: date · task · notes checked · result · gaps.
 
+## 2026-11-03 · M9 data quality
+- Notes checked: [[M9 Data quality]], [[M4 SMS import]], [[M3 Transaction parser]], [[M5 Categorization]] (refund/transfer set categories), [[M6 Monthly dashboard]] (rules recorded), [[Security checklist]], [[Non-functional requirements]].
+- Result: **pass, with gaps.** Backend 117 tests, frontend 14 tests, lint, build, `npm audit` (high) clean; NuGet scan clean (no new packages). Live on compose Postgres: migration `AddDataQuality` applied; same-ref second message flagged (possibleDuplicates 1); different ref not flagged; refund linked to purchase; transfer pair marked on both rows; unreadable message listed; other user 404, no token 401.
+- Security walk: all 5 new endpoints `[Authorize]`, owner from token, owner-scoped queries, 401 tests; no secrets; no new dependencies; stored-text exception recorded in the Security checklist.
+- Decision made with the user: store capped unparsed text (exception to "no raw bodies"); build all of M9 in one pass.
+- Gaps: M6 must apply the exclusion/refund rules (not built); no accounts entity; email source untested (M2 missing); real-message accuracy unmeasured; partial refunds unsupported; UI not browser-tested.
+- Not re-verified: M1, M8 ticks (exercised only through the test run); stale `docs/security.md` refresh done in the same commit.
+
 ## 2026-11-03 · M5 categorization (rules only)
 - Notes checked: [[M5 Categorization]], [[Security checklist]], [[Non-functional requirements]], [[M3 Transaction parser]] (parser unchanged), [[M4 SMS import]] (import now categorizes).
 - Result: **pass for the rules part.** Backend 70 tests, frontend 12 tests, lint, build, `npm audit` (high) and NuGet vulnerability scan all clean. Live on compose Postgres: migration applied, import categorized Swiggy as Food & Dining, correction saved, bad category 400, no token 401, other user 404.

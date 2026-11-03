@@ -16,6 +16,8 @@ verified: e2e on samples
 - [x] Paste UI — `frontend/src/TransactionsPanel.tsx`
 - [ ] File upload (only paste is built)
 - [ ] Duplicate re-import is skipped (confirm in `TransactionService.cs` + tests)
-- [ ] Raw SMS text not retained beyond parsed fields (check what `Transaction` stores — `Domain/Entities/Transaction.cs`)
+- [x] Raw SMS text not retained for **parsed** messages: `Transaction` stores only parsed fields plus a SHA-256 of the text
+- [x] Unreadable messages are kept for review only (≤ 500 chars, ≤ 200 per user, deletable) — deliberate exception, see [[M9 Data quality]]
+- [x] Unreadable messages are listed again in the needs-review panel instead of vanishing after import
 
 Related: [[Security checklist]]

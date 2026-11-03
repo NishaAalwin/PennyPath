@@ -31,15 +31,21 @@ public partial class SmsTransactionParser : ITransactionParser
         if (Ignore.Any(lower.Contains)) return null;
 
         var amount = FindAmount(t);
-        var type = FindType(lower);
+        var isRefund = RefundRx().IsMatch(lower);
+        var type = isRefund ? TransactionType.Income : FindType(lower);
         if (amount is null || type is null) return null;
+
+        var merchant = FindMerchant(t, type.Value);
+        if (merchant is null && isRefund) merchant = FindMerchant(t, TransactionType.Expense); // "refund ... at SWIGGY"
 
         return new ParsedTransaction(
             amount.Value,
             type.Value,
             FindDate(t) ?? fallbackDate,
-            FindMerchant(t, type.Value),
-            FindAccount(t));
+            merchant,
+            FindAccount(t),
+            FindReference(t),
+            isRefund);
     }
 
     private static decimal? FindAmount(string t)
@@ -93,11 +99,24 @@ public partial class SmsTransactionParser : ITransactionParser
             : name;
     }
 
+    private static string? FindReference(string t)
+    {
+        var m = ReferenceRx().Match(t);
+        return m.Success ? m.Groups["r"].Value : null;
+    }
+
     private static string? FindAccount(string t)
     {
         var m = AccountRx().Match(t);
         return m.Success ? m.Groups["n"].Value : null;
     }
+
+    [GeneratedRegex(@"\b(?:refund(?:ed)?|reversal|reversed)\b")]
+    private static partial Regex RefundRx();
+
+    // "Ref 4567890123", "UPI Ref No. 998877", "UTR: AB123456789"; the value must contain a digit.
+    [GeneratedRegex(@"\b(?:reference|ref|utr|rrn|txn)(?![A-Za-z])\s*(?:no\.?|number|id)?\s*[:#.\-]?\s*(?<r>(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{6,30})", RegexOptions.IgnoreCase)]
+    private static partial Regex ReferenceRx();
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex Whitespace();

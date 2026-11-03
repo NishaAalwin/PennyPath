@@ -34,6 +34,29 @@ public class TransactionsController(ITransactionService transactions) : Controll
             _ => NotFound(),
         };
 
+    [HttpPut("api/transactions/{id:guid}/transfer")]
+    public async Task<IActionResult> SetTransfer(Guid id, SetTransferRequest request, CancellationToken ct) =>
+        Result(await transactions.SetTransferAsync(UserId, id, request.IsTransfer, ct));
+
+    [HttpPost("api/transactions/{id:guid}/not-duplicate")]
+    public async Task<IActionResult> NotDuplicate(Guid id, CancellationToken ct) =>
+        Result(await transactions.ClearDuplicateAsync(UserId, id, ct));
+
+    [HttpDelete("api/transactions/{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct) =>
+        Result(await transactions.DeleteAsync(UserId, id, ct));
+
+    [HttpGet("api/review/unparsed")]
+    public async Task<IActionResult> Unparsed(CancellationToken ct) =>
+        Ok(await transactions.ListUnparsedAsync(UserId, ct));
+
+    [HttpDelete("api/review/unparsed/{id:guid}")]
+    public async Task<IActionResult> DismissUnparsed(Guid id, CancellationToken ct) =>
+        Result(await transactions.DismissUnparsedAsync(UserId, id, ct));
+
+    private IActionResult Result(TransactionActionResult r) =>
+        r == TransactionActionResult.Done ? NoContent() : NotFound();
+
     [HttpGet("api/transactions")]
     public async Task<IActionResult> List([FromQuery] string? month, CancellationToken ct)
     {

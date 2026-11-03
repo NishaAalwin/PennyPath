@@ -52,3 +52,6 @@ Account credentials, financial transactions (amounts, merchants, accounts), and 
 9. **Docker base images are not scanned** (add Trivy or similar), and the API container's `Server` banner is removed but nginx still shows `Server: nginx` (version hidden).
 10. **Not penetration tested.** The CSP and form behaviour were not checked in a real browser.
 11. **Privacy/compliance:** account deletion and data export are not implemented (needed for GDPR/DPDP-style obligations); the AI features will need consent and data minimisation (send aggregates, not raw messages).
+
+## Update 2026-11-03: stored unparsed messages (M9)
+Messages the parser cannot read are kept so the user can review them: up to 500 characters each, up to 200 per user, deleted when dismissed or when the account is deleted (cascade). They can contain account digits or balances the user pasted. They are never sent to any external service. Account deletion/export (item 11 above) must cover them. New endpoints (`/api/review/unparsed`, `/api/transactions/{id}` delete, transfer and not-duplicate) all require a JWT and are scoped to the token's user; cross-user access returns 404 (tested).

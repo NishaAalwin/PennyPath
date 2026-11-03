@@ -19,6 +19,19 @@ public class Transaction
     public string? Account { get; set; }
     public TransactionSource Source { get; set; }
 
+    /// <summary>Bank reference (UTR/Ref no.) when the message has one; the same reference means the same payment.</summary>
+    public string? Reference { get; set; }
+
+    /// <summary>A refund or reversal. It offsets the expense it links to and must not count as income.</summary>
+    public bool IsRefund { get; set; }
+    public Guid? RefundOfId { get; set; }
+
+    /// <summary>Set when this row looks like a second message about the same payment; excluded from totals until the user decides.</summary>
+    public Guid? DuplicateOfId { get; set; }
+
+    /// <summary>Money moved between the user's own accounts; not income or expense.</summary>
+    public bool IsTransfer { get; set; }
+
     /// <summary>SHA-256 of the normalized source text; with UserId it is unique, so re-importing a message is a no-op.</summary>
     public string RawHash { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -23,7 +23,7 @@ Every task is checked against this vault before it is called done. See [[Task Pr
 | M6 | not started |
 | M7 | partial (list only) |
 | M8 | done (Docker + CI green) |
-| M9 | not started (new) |
+| M9 | done with gaps: flags duplicates/refunds/transfers + needs-review list; accounts entity, real-email and accuracy unverified; M6 must apply the exclusion rules |
 | M10 | not started (new) |
 | M11 | not started (new) |
 | M12 | not started (new); must finish before M2 ships |

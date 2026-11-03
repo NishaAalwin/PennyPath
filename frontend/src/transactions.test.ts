@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { importSms, listTransactions, setCategory, splitMessages } from './transactions'
+import { deleteTransaction, dismissUnparsed, listUnparsed, notDuplicate, setTransfer, importSms, listTransactions, setCategory, splitMessages } from './transactions'
 
 const asFetch = (f: unknown) => f as unknown as typeof fetch
 
@@ -43,5 +43,30 @@ describe('transactions api', () => {
     expect(url).toMatch(/\/api\/transactions\/abc\/category$/)
     expect(init.method).toBe('PUT')
     expect(JSON.parse(init.body)).toEqual({ category: 'Groceries' })
+  })
+
+  const noContent = () => vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => { throw new Error('no body') } })
+
+  it('setTransfer, notDuplicate, deleteTransaction and dismissUnparsed use the right verbs and paths', async () => {
+    const f = noContent()
+    await setTransfer('tok', 'a', true, asFetch(f))
+    await notDuplicate('tok', 'b', asFetch(f))
+    await deleteTransaction('tok', 'c', asFetch(f))
+    await dismissUnparsed('tok', 'd', asFetch(f))
+
+    const calls = f.mock.calls.map(([url, init]) => [init.method, String(url).replace(/^.*?\/api/, '/api')])
+    expect(calls).toEqual([
+      ['PUT', '/api/transactions/a/transfer'],
+      ['POST', '/api/transactions/b/not-duplicate'],
+      ['DELETE', '/api/transactions/c'],
+      ['DELETE', '/api/review/unparsed/d'],
+    ])
+    expect(JSON.parse(f.mock.calls[0][1].body)).toEqual({ isTransfer: true })
+  })
+
+  it('listUnparsed returns the needs-review messages', async () => {
+    const f = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [{ id: '1', text: 'x', createdAt: 'now' }] })
+    expect(await listUnparsed('tok', asFetch(f))).toHaveLength(1)
+    expect(f.mock.calls[0][0]).toMatch(/\/api\/review\/unparsed$/)
   })
 })
