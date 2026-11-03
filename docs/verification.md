@@ -128,3 +128,20 @@ User decision: read and keep only amount, where/what (merchant), date and debit/
 - Merchant text is free text from the message and may occasionally include a name or UPI handle part.
 - The migration permanently deleted previously stored account numbers, references and unreadable-message text from the development database.
 - Without reference numbers, two real same-day purchases at one merchant for the same amount are flagged as possible duplicates (the user confirms). Transfers between own accounts are marked by the user.
+
+## M6 completion: trend, charts, performance (2026-11-03)
+
+| Check | Status | Notes |
+|---|---|---|
+| Backend tests | 131 pass | Adds trend: months oldest first, empty months, each month equals its summary, year boundary, duplicates/transfers excluded, per-user, bad parameters, 401 |
+| Frontend tests, lint, build, `npm audit` | Verified (Node 24) | 26 tests pass (chart math, API calls); no vulnerabilities |
+| Chart palette | **Verified** | dataviz validator, light and dark: lightness band, chroma, CVD (worst adjacent ΔE 24.7 light / 26.8 dark), normal-vision floor, contrast all pass |
+| Charts rendered | **Viewed** | Real components server-rendered to HTML and screenshotted in Edge, light and dark; no overlap or clipping at 480 px wide |
+| Hover tooltip, keyboard focus, month picker in a real browser | Not verified | Only the static render was viewed |
+| Performance, 10,000 rows | **Measured** | Compose Postgres, one user, 5 runs each over curl: summary 0.22–0.32 s, trend (6 and 12 months) 0.22–0.26 s, transaction list 0.23–0.28 s. API time on a developer laptop with Docker; browser render time not measured. Requirement: under 2 s |
+| Correctness at 10k rows | **Verified** | September income and expense from the API equal a direct SQL sum to the paisa |
+
+### Known limitations
+- No texture fallback for colour-vision/print/forced-colors beyond the validated colour pair and the table view.
+- `GET /api/transactions` returns every row (10,000 rows answered in ~0.25 s here); pagination belongs to M7.
+- A month where refunds exceed spending has negative net spend; the chart shows no column for it, the tooltip and table show the value.

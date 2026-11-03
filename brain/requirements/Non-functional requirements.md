@@ -7,7 +7,7 @@ From `docs/requirements.md` §6.
 | Security | encrypted tokens at rest, HTTPS, no raw email bodies stored, "delete my data" | partial — see [[Security checklist]] |
 | Data minimisation | only amount, where/what, date, debit/credit stored in PostgreSQL; no account/reference numbers, balances or message text | done, see [[Data minimisation]] |
 | Privacy | only transaction-like emails read (sender + keyword filter) | n/a until [[M2 Gmail import]] |
-| Performance | dashboard < 2 s for 10k transactions | unmeasured |
+| Performance | dashboard < 2 s for 10k transactions | API ~0.22–0.32 s per endpoint with 10,000 rows (compose Postgres, 2026-11-03); browser render time not measured |
 | Quality | ≥ 70% unit-test coverage on parser and services | unmeasured |
 | Parser accuracy | ≥ 90% on real bank alerts | unmeasured, see [[M3 Transaction parser]] |
 | Categorization accuracy | ≥ 85% on ≥ 100 labelled transactions | unmeasured |

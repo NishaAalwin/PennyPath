@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import SummaryPanel from './SummaryPanel'
 import {
-  deleteTransaction, getSummary, importSms, listCategories, listTransactions, notDuplicate,
-  setCategory, setTransfer, splitMessages, type ImportResult, type MonthlySummary, type Transaction,
+  deleteTransaction, getSummary, getTrend, importSms, listCategories, listTransactions, notDuplicate,
+  setCategory, setTransfer, splitMessages, type ImportResult, type MonthlySummary, type Transaction, type TrendMonth,
 } from './transactions'
 
 type Props = { token: string; onSessionExpired: () => void }
@@ -17,6 +17,7 @@ export default function Transactions({ token, onSessionExpired }: Props) {
   const [busy, setBusy] = useState(false)
   const [categories, setCategories] = useState<string[]>([])
   const [summary, setSummary] = useState<MonthlySummary | null>(null)
+  const [trend, setTrend] = useState<TrendMonth[]>([])
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
 
   const handleError = useCallback(
@@ -28,7 +29,7 @@ export default function Transactions({ token, onSessionExpired }: Props) {
   )
 
   const refresh = useCallback(
-    () => Promise.all([listTransactions(token).then(setRows), getSummary(token, month).then(setSummary)]).catch(handleError),
+    () => Promise.all([listTransactions(token).then(setRows), getSummary(token, month).then(setSummary), getTrend(token, month).then(setTrend)]).catch(handleError),
     [token, month, handleError],
   )
 
@@ -67,7 +68,7 @@ export default function Transactions({ token, onSessionExpired }: Props) {
 
   return (
     <section style={{ display: 'grid', gap: '0.75rem' }}>
-      <SummaryPanel summary={summary} month={month} onMonthChange={setMonth} />
+      <SummaryPanel summary={summary} trend={trend} month={month} onMonthChange={setMonth} />
 
       <h2>Import SMS</h2>
       <p style={{ margin: 0 }}>Paste your bank SMS messages here, with a blank line between messages. Only the amount, where it was spent, the date and whether it was money in or out are saved. The message text is not stored.</p>

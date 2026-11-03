@@ -62,6 +62,19 @@ public class TransactionsController(ITransactionService transactions) : Controll
         }
     }
 
+    [HttpGet("api/trend")]
+    public async Task<IActionResult> Trend([FromQuery] int months = 6, [FromQuery] string? to = null, CancellationToken ct = default)
+    {
+        try
+        {
+            return Ok(await transactions.TrendAsync(UserId, months, to, ct));
+        }
+        catch (ArgumentException)
+        {
+            return BadRequest(new { error = "months must be 2-12 and to must be formatted yyyy-MM." });
+        }
+    }
+
     [HttpGet("api/transactions")]
     public async Task<IActionResult> List([FromQuery] string? month, CancellationToken ct)
     {

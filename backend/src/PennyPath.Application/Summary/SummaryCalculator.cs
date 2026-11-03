@@ -12,6 +12,9 @@ public record MonthlySummary(
     IReadOnlyList<SummaryLine> ByCategory, IReadOnlyList<SummaryLine> ByMerchant,
     int Counted, int Excluded);
 
+/// <summary>One month of the trend; same rules as <see cref="MonthlySummary"/>.</summary>
+public record TrendMonth(string Month, decimal Income, decimal Expense, decimal Savings);
+
 public record SummaryRow(
     TransactionType Type, decimal Amount, bool IsRefund, bool IsTransfer, bool IsDuplicate, string Category, string Merchant);
 

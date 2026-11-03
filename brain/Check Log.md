@@ -2,6 +2,11 @@
 
 Newest first. One entry per task: date · task · notes checked · result · gaps.
 
+## 2026-11-03 · M6 completion: trend, charts, performance
+- Notes checked: [[M6 Monthly dashboard]], [[Non-functional requirements]], [[Security checklist]], [[Data minimisation]] (summary uses only stored fields), [[M9 Data quality]] (exclusion rules reused).
+- Result: **pass, with gaps.** Backend 131 tests, frontend 26 tests, lint, build, `npm audit` (high) clean. New `GET /api/trend` is `[Authorize]`, owner-scoped, validated (2–12 months). Palette run through the dataviz validator in light and dark (all checks pass). Charts rendered with the real components and viewed in Edge, light and dark. With 10,000 rows in the compose Postgres each endpoint took ~0.22–0.32 s; September totals matched a direct SQL sum exactly. Test user and rows were deleted afterwards.
+- Gaps: tooltip/focus/pointer not tested in a real browser; no texture fallback; no direct labels on columns; chart card self-themed because the app has no theme; list endpoint returns all rows (pagination is M7).
+
 ## 2026-11-03 · Data minimisation + monthly summary (user request)
 - User request: read only amount and where/what, summarise it, save in PostgreSQL. Decisions with the user: keep amount, where/what, date, debit/credit; stop storing unreadable messages; summary = totals by where/what (M6).
 - Notes checked: [[Data minimisation]] (new), [[M6 Monthly dashboard]], [[M9 Data quality]] (revised), [[M3 Transaction parser]], [[M4 SMS import]], [[Security checklist]], [[Non-functional requirements]].

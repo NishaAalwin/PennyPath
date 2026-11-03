@@ -38,6 +38,12 @@ public interface ITransactionService
     /// <summary>Income, expense, savings and totals by place and category for one month (default: current month).</summary>
     Task<MonthlySummary> SummaryAsync(Guid userId, string? month, CancellationToken ct = default);
 
+    /// <summary>
+    /// Income, expense and savings for each of the last <paramref name="months"/> months (oldest first, empty months
+    /// included), ending at <paramref name="to"/> ("yyyy-MM", default current month).
+    /// </summary>
+    Task<IReadOnlyList<TrendMonth>> TrendAsync(Guid userId, int months, string? to, CancellationToken ct = default);
+
     /// <param name="month">Optional "yyyy-MM" filter.</param>
     Task<IReadOnlyList<TransactionDto>> ListAsync(Guid userId, string? month, CancellationToken ct = default);
 }

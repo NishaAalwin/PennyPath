@@ -1,8 +1,8 @@
 ---
 id: M6
 release: MVP
-status: partial
-verified: 119 backend + 14 frontend tests; live on compose Postgres (2026-11-03); browser UI untested
+status: done-with-gaps
+verified: 131 backend + 26 frontend tests; live on compose Postgres incl. 10,000-row timing (2026-11-03); charts rendered and viewed in light and dark; interactive hover/focus not browser-tested
 ---
 # M6 Monthly dashboard
 
@@ -26,9 +26,14 @@ User decision 2026-11-03 ([[Data minimisation]]): "summarised" means totals by *
 - [x] Empty month handled
 - [x] Month = the date taken from the message (calendar month, no timezone conversion)
 - [x] UI: month picker, totals, "Where it went", "By category" — `frontend/src/SummaryPanel.tsx`
-- [ ] **Trend** (compare months / last N months) — not built
-- [ ] **Performance:** < 2 s with 10k transactions — not measured (index on user+amount+date exists; summary loads the month's rows into memory)
-- [ ] Charts (only tables so far; use the `dataviz` skill, not colour-only)
+- [x] **Trend:** `GET /api/trend?months=2-12&to=yyyy-MM` (default 6, ending this month), oldest first, empty months included; each month equals that month's summary (tested); duplicates/transfers excluded, per-user, bad params → 400, no token → 401
+- [x] **Performance:** with 10,000 rows for one user in the compose Postgres, `/api/summary`, `/api/trend` (6 and 12 months) and `/api/transactions` each answered in about 0.22–0.32 s over 5 runs (curl, dev laptop, Docker). That is API time, not browser render. Totals matched a direct SQL sum exactly.
+- [x] **Charts** built with the `dataviz` skill: grouped columns for income vs spent (categorical slots 1–2, validated in light and dark: CVD ΔE ≥ 24.7, contrast ≥ 3:1), ranked horizontal bars (one hue, largest first, top 8 + "Other") for where/category, legend, "Show as table" under each, dark mode, 24px bar cap, 4px rounded data end, 2px pair gap — `frontend/src/TrendChart.tsx`, `BarList.tsx`, `charts.css`, `chartMath.ts` (unit tested)
+- [x] Rendered to HTML and viewed in Edge, light and dark: no overlap or clipping at 480px
+- [ ] Hover tooltip, keyboard focus and pointer behaviour **not tested in a browser** (only the static render was viewed)
+- [ ] No texture fallback (opt-in backup channel in the skill) and no direct labels on columns; identity rests on legend + tooltip + table
+- [ ] Negative net spend in a month (refunds larger than spending) is drawn as no column; the tooltip and table show the real value
+- [ ] Chart card carries its own light/dark surface because the app itself has no theme yet
 - [ ] Message with no date uses the import date (parser fallback), which can put it in the wrong month
 - [ ] Browser check of the panel
 

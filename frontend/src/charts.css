@@ -1,0 +1,93 @@
+/* Chart tokens. Series colors are categorical slots 1 and 2 of the reference palette, validated in both modes. */
+.viz {
+  color-scheme: light;
+  --surface-1: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #6b6a66;
+  --grid: #e6e5e1;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+
+  position: relative;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  border: 1px solid var(--grid);
+  border-radius: 8px;
+  padding: 12px 16px 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) .viz {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #9a998f;
+    --grid: #2e2e2c;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+  }
+}
+
+:root[data-theme='dark'] .viz {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --text-primary: #f0efec;
+  --text-secondary: #c3c2b7;
+  --text-muted: #9a998f;
+  --grid: #2e2e2c;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+}
+
+.viz h3 { margin: 0 0 4px; font-size: 1rem; }
+.viz-sub { margin: 0 0 8px; color: var(--text-secondary); font-size: 0.85rem; }
+
+.viz-legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 0 0 8px; padding: 0; list-style: none; font-size: 0.85rem; color: var(--text-secondary); }
+.viz-legend li { display: flex; align-items: center; gap: 6px; }
+.viz-swatch { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+.viz-swatch.s1, .viz-key.s1 { background: var(--series-1); }
+.viz-swatch.s2, .viz-key.s2 { background: var(--series-2); }
+
+.viz svg { width: 100%; height: auto; display: block; overflow: visible; }
+.viz-grid { stroke: var(--grid); stroke-width: 1; }
+.viz-tick, .viz-xlabel { fill: var(--text-muted); font-size: 11px; font-family: inherit; }
+.viz-col-1 { fill: var(--series-1); }
+.viz-col-2 { fill: var(--series-2); }
+.viz-slot-band { fill: var(--grid); opacity: 0; }
+.viz-slot.is-active .viz-slot-band { opacity: 0.5; }
+.viz-slot.is-active .viz-col-1, .viz-slot.is-active .viz-col-2 { filter: brightness(1.12); }
+.viz-slot { outline: none; }
+.viz-slot:focus-visible .viz-slot-band { opacity: 0.5; stroke: var(--text-secondary); stroke-width: 1; }
+
+.viz-tooltip {
+  position: absolute; z-index: 1; top: 56px; transform: translateX(-50%);
+  min-width: 150px; padding: 8px 10px; pointer-events: none;
+  background: var(--surface-1); border: 1px solid var(--grid); border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); font-size: 0.85rem;
+}
+.viz-tooltip strong { font-weight: 600; color: var(--text-primary); }
+.viz-tooltip .head { color: var(--text-secondary); margin-bottom: 4px; }
+.viz-tooltip .row { display: flex; align-items: center; gap: 6px; justify-content: space-between; }
+.viz-tooltip .row .name { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+.viz-key { width: 10px; height: 2px; display: inline-block; }
+
+.viz-bars { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.viz-bar-row { display: grid; grid-template-columns: minmax(70px, 30%) 1fr auto; align-items: center; gap: 8px; font-size: 0.9rem; }
+.viz-bar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); }
+.viz-bar-track { height: 14px; }
+.viz-bar-fill { height: 14px; background: var(--series-1); border-radius: 0 4px 4px 0; min-width: 0; }
+.viz-bar-value { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.viz-bar-row:hover .viz-bar-fill, .viz-bar-row:focus-within .viz-bar-fill { filter: brightness(1.12); }
+
+.viz details { margin-top: 8px; font-size: 0.85rem; color: var(--text-secondary); }
+.viz summary { cursor: pointer; }
+.viz table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.viz th, .viz td { padding: 2px 4px; }
+.viz td.num, .viz th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.viz tbody tr { border-top: 1px solid var(--grid); }
+
+@media (forced-colors: active) {
+  .viz-col-1, .viz-col-2, .viz-bar-fill, .viz-swatch { forced-color-adjust: none; }
+}

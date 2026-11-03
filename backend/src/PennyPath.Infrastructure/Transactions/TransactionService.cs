@@ -172,6 +172,37 @@ public partial class TransactionService(AppDbContext db, ITransactionParser pars
         return SummaryCalculator.Compute(start.ToString("yyyy-MM", CultureInfo.InvariantCulture), rows);
     }
 
+    public const int MinTrendMonths = 2;
+    public const int MaxTrendMonths = 12;
+
+    public async Task<IReadOnlyList<TrendMonth>> TrendAsync(Guid userId, int months, string? to, CancellationToken ct = default)
+    {
+        if (months < MinTrendMonths || months > MaxTrendMonths)
+            throw new ArgumentOutOfRangeException(nameof(months), $"months must be between {MinTrendMonths} and {MaxTrendMonths}");
+
+        var last = to is null
+            ? new DateOnly(clock.GetUtcNow().Year, clock.GetUtcNow().Month, 1)
+            : DateOnly.TryParseExact(to + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+                ? d
+                : throw new ArgumentException("to must be formatted yyyy-MM", nameof(to));
+        var first = last.AddMonths(-(months - 1));
+        var end = last.AddMonths(1);
+
+        var rows = await db.Transactions
+            .Where(t => t.UserId == userId && t.Date >= first && t.Date < end)
+            .Select(t => new { t.Date, Row = new SummaryRow(t.Type, t.Amount, t.IsRefund, t.IsTransfer, t.DuplicateOfId != null, t.Category, t.Merchant) })
+            .ToListAsync(ct);
+
+        return Enumerable.Range(0, months).Select(i =>
+        {
+            var m = first.AddMonths(i);
+            var s = SummaryCalculator.Compute(
+                m.ToString("yyyy-MM", CultureInfo.InvariantCulture),
+                rows.Where(r => r.Date.Year == m.Year && r.Date.Month == m.Month).Select(r => r.Row).ToList());
+            return new TrendMonth(s.Month, s.Income, s.Expense, s.Savings);
+        }).ToList();
+    }
+
     private static string Hash(string text)
     {
         var normalized = Whitespace().Replace(text, " ").Trim().ToLowerInvariant();

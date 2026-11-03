@@ -24,6 +24,7 @@ public class AuthEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [InlineData("POST", "/api/sms/import")]
     [InlineData("GET", "/api/categories")]
     [InlineData("GET", "/api/summary")]
+    [InlineData("GET", "/api/trend")]
     [InlineData("DELETE", "/api/transactions/3fa85f64-5717-4562-b3fc-2c963f66afa6")]
     [InlineData("POST", "/api/transactions/3fa85f64-5717-4562-b3fc-2c963f66afa6/not-duplicate")]
     [InlineData("PUT", "/api/transactions/3fa85f64-5717-4562-b3fc-2c963f66afa6/transfer")]

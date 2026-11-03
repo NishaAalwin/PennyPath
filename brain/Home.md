@@ -20,7 +20,7 @@ Every task is checked against this vault before it is called done. See [[Task Pr
 | M3 | done, accuracy on real messages unmeasured |
 | M4 | done (paste import) |
 | M5 | rules + user correction done; AI fallback deferred; accuracy unmeasured |
-| M6 | partial: monthly summary (totals, by place, by category) done; trend, charts, performance missing |
+| M6 | done with gaps: summary, trend, charts and 10k-row timing done; browser hover/focus untested, no texture fallback |
 | M7 | partial (list only) |
 | M8 | done (Docker + CI green) |
 | M9 | done with gaps: flags duplicates, links refunds, manual transfers; no email source yet, accuracy unmeasured |

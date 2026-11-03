@@ -1,32 +1,17 @@
-import type { MonthlySummary, SummaryLine } from './transactions'
+import BarList from './BarList'
+import TrendChart from './TrendChart'
+import type { MonthlySummary, TrendMonth } from './transactions'
 
 const inr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' })
 
-type Props = { summary: MonthlySummary | null; month: string; onMonthChange: (month: string) => void }
-
-function Breakdown({ title, lines }: { title: string; lines: SummaryLine[] }) {
-  return (
-    <div>
-      <h3 style={{ margin: '0 0 0.25rem' }}>{title}</h3>
-      {lines.length === 0 ? (
-        <p style={{ margin: 0 }}>Nothing yet.</p>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <tbody>
-            {lines.map((l) => (
-              <tr key={l.name}>
-                <td>{l.name}</td>
-                <td align="right">{inr.format(l.amount)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
-  )
+type Props = {
+  summary: MonthlySummary | null
+  trend: TrendMonth[]
+  month: string
+  onMonthChange: (month: string) => void
 }
 
-export default function SummaryPanel({ summary, month, onMonthChange }: Props) {
+export default function SummaryPanel({ summary, trend, month, onMonthChange }: Props) {
   return (
     <section style={{ display: 'grid', gap: '0.75rem' }}>
       <h2>Summary</h2>
@@ -45,10 +30,11 @@ export default function SummaryPanel({ summary, month, onMonthChange }: Props) {
               of these totals (see the list below).
             </p>
           )}
-          <Breakdown title="Where it went" lines={summary.byMerchant} />
-          <Breakdown title="By category" lines={summary.byCategory} />
+          <BarList title="Where it went" lines={summary.byMerchant} />
+          <BarList title="By category" lines={summary.byCategory} />
         </>
       )}
+      {trend.length > 0 && <TrendChart months={trend} />}
     </section>
   )
 }

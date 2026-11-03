@@ -27,6 +27,8 @@ export type MonthlySummary = {
   excluded: number
 }
 
+export type TrendMonth = { month: string; income: number; expense: number; savings: number }
+
 export type ImportResult = { imported: number; duplicates: number; unparsed: string[]; possibleDuplicates: number }
 
 type Fetch = typeof fetch
@@ -74,3 +76,6 @@ export const deleteTransaction = (token: string, id: string, fetchFn: Fetch = fe
 
 export const getSummary = (token: string, month?: string, fetchFn: Fetch = fetch) =>
   authed<MonthlySummary>(token, `/api/summary${month ? `?month=${month}` : ''}`, {}, fetchFn)
+
+export const getTrend = (token: string, to?: string, months = 6, fetchFn: Fetch = fetch) =>
+  authed<TrendMonth[]>(token, `/api/trend?months=${months}${to ? `&to=${to}` : ''}`, {}, fetchFn)

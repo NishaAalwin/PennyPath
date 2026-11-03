@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { deleteTransaction, getSummary, notDuplicate, setTransfer, importSms, listTransactions, setCategory, splitMessages } from './transactions'
+import { deleteTransaction, getSummary, getTrend, notDuplicate, setTransfer, importSms, listTransactions, setCategory, splitMessages } from './transactions'
 
 const asFetch = (f: unknown) => f as unknown as typeof fetch
 
@@ -67,5 +67,11 @@ describe('transactions api', () => {
     const f = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => body })
     expect(await getSummary('tok', '2026-11', asFetch(f))).toEqual(body)
     expect(f.mock.calls[0][0]).toMatch(/\/api\/summary\?month=2026-11$/)
+  })
+
+  it('getTrend asks for the months ending at the chosen month', async () => {
+    const f = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    await getTrend('tok', '2026-11', 6, asFetch(f))
+    expect(f.mock.calls[0][0]).toMatch(/\/api\/trend\?months=6&to=2026-11$/)
   })
 })
