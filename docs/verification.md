@@ -90,6 +90,8 @@ Breaking change for local setup: copy `.env.example` to `.env` and fill in `POST
 
 ## M9: data quality (2026-11-03)
 
+> Partly superseded the same day by the data-minimisation section below: reference/account numbers and stored unreadable messages were removed, and automatic transfer detection was dropped.
+
 | Check | Status | Notes |
 |---|---|---|
 | Backend tests | 117 pass | Adds parser (reference numbers, refund/reversal wording), reconciler rules incl. false-positive guards, service behaviour, per-user isolation, caps, 401 for every new endpoint |
@@ -106,4 +108,23 @@ Breaking change for local setup: copy `.env.example` to `.env` and fill in `POST
 - Partial refunds and refunds imported before the purchase are not linked.
 - There is no accounts entity yet; "account" is the last digits found in each message.
 - The dashboard (M6) is not built; it must exclude duplicates and transfers and treat refunds as negative expense (recorded in the brain).
-- Unparsed SMS text is stored (capped, deletable). This is a recorded exception to "no raw bodies stored".
+- (Removed later the same day: unparsed text is no longer stored. See below.)
+
+## Data minimisation + monthly summary (2026-11-03)
+
+User decision: read and keep only amount, where/what (merchant), date and debit/credit, in PostgreSQL; summarise by where/what.
+
+| Check | Status | Notes |
+|---|---|---|
+| Backend tests | 119 pass | Parser output pinned to amount, type, date, merchant, refund flag; stored model has no account/reference/text columns; unreadable messages not stored; reconciler without account/reference; summary rules and per-user isolation |
+| Frontend tests, lint, build, `npm audit` | Verified (Node 24) | 14 tests pass; no vulnerabilities |
+| Migration `MinimiseStoredData` on real Postgres | **Verified** | Applied on top of a database holding rows from earlier versions. psql: tables are only `Transactions`, `Users`, `__EFMigrationsHistory`; `Transactions` has no `Account`/`Reference`; no merchant contains a 4-digit run |
+| `GET /api/summary` end to end | **Verified** | Income 15,000; spent 600 (Swiggy 250 duplicate excluded; Amazon 450 minus a 100 refund); saved 14,400; by place and by category sum to total expense; bad month 400; no token 401 |
+| Summary panel in a real browser | Not verified | Same browser limitation as before |
+| Trend, charts, 10k-row performance | **Not done / not measured** | Remaining M6 items |
+
+### Known limitations
+- A SHA-256 of the normalised message text is still stored (to skip re-imports). It could be guessed for short structured SMS by someone holding the database; an HMAC with a server secret would fix it.
+- Merchant text is free text from the message and may occasionally include a name or UPI handle part.
+- The migration permanently deleted previously stored account numbers, references and unreadable-message text from the development database.
+- Without reference numbers, two real same-day purchases at one merchant for the same amount are flagged as possible duplicates (the user confirms). Transfers between own accounts are marked by the user.

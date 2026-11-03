@@ -15,17 +15,6 @@ public class DataQualityParserTests
     private readonly SmsTransactionParser _parser = new();
     private static readonly DateOnly Today = new(2026, 11, 3);
 
-    [Theory]
-    [InlineData("Sent Rs.250.00 From HDFC Bank A/c *1234 To SWIGGY On 02/11/26 Ref 4567890123", "4567890123")]
-    [InlineData("Rs.500.00 credited to a/c **2222 on 30-10-26 from RAHUL SHARMA. UPI Ref 998877", "998877")]
-    [InlineData("INR 99 debited from A/c XX1 on 01-11-26 to ZOMATO. UTR: AB1234567890", "AB1234567890")]
-    public void Reference_numbers_are_extracted(string sms, string expected) =>
-        Assert.Equal(expected, _parser.Parse(sms, Today)!.Reference);
-
-    [Fact]
-    public void Message_without_reference_has_none() =>
-        Assert.Null(_parser.Parse("Rs 450 spent on card XX9876 at AMAZON on 02-Nov-26", Today)!.Reference);
-
     [Fact]
     public void Refund_is_income_flagged_as_refund_with_merchant()
     {
@@ -50,6 +39,12 @@ public class DataQualityParserTests
     [Fact]
     public void Normal_credit_is_not_a_refund() =>
         Assert.False(_parser.Parse("Rs. 15,000.00 credited to your A/c XX5678 on 01-11-2026 by salary", Today)!.IsRefund);
+
+    [Fact]
+    public void Parsed_result_carries_only_amount_direction_date_merchant_and_refund_flag() =>
+        Assert.Equal(
+            ["Amount", "Type", "Date", "Merchant", "IsRefund"],
+            typeof(ParsedTransaction).GetProperties().Select(p => p.Name).Where(n => n != "EqualityContract"));
 }
 
 public class TransactionReconcilerTests
@@ -57,53 +52,44 @@ public class TransactionReconcilerTests
     private static readonly Guid U = Guid.NewGuid();
     private static readonly DateOnly D = new(2026, 11, 2);
 
-    private static Transaction Tx(decimal amount, TransactionType type, string merchant = "Swiggy", string? account = "1234",
-        string? reference = null, DateOnly? date = null, bool refund = false) => new()
+    private static Transaction Tx(decimal amount, TransactionType type, string merchant = "Swiggy",
+        DateOnly? date = null, bool refund = false) => new()
     {
-        UserId = U, Amount = amount, Type = type, Merchant = merchant, Account = account,
-        Reference = reference, Date = date ?? D, IsRefund = refund, Category = "Food & Dining",
+        UserId = U, Amount = amount, Type = type, Merchant = merchant, Date = date ?? D, IsRefund = refund, Category = "Food & Dining",
     };
 
     private static void Run(IEnumerable<Transaction> fresh, params Transaction[] existing) =>
         TransactionReconciler.Reconcile(fresh.ToList(), existing);
 
     [Fact]
-    public void Same_reference_is_a_duplicate_even_on_another_day()
-    {
-        var a = Tx(250, TransactionType.Expense, reference: "REF123456");
-        var b = Tx(250, TransactionType.Expense, reference: "ref123456", date: D.AddDays(1));
-        Run([b], a);
-        Assert.Equal(a.Id, b.DuplicateOfId);
-    }
-
-    [Fact]
-    public void Different_references_are_two_real_payments()
-    {
-        var a = Tx(250, TransactionType.Expense, reference: "REF111111");
-        var b = Tx(250, TransactionType.Expense, reference: "REF222222");
-        Run([b], a);
-        Assert.Null(b.DuplicateOfId);
-    }
-
-    [Fact]
-    public void Same_amount_day_account_merchant_without_references_is_flagged()
+    public void Same_amount_day_direction_and_merchant_is_flagged_as_a_possible_duplicate()
     {
         var a = Tx(250, TransactionType.Expense);
-        var b = Tx(250, TransactionType.Expense);
+        var b = Tx(250, TransactionType.Expense, "SWIGGY");
         Run([b], a);
         Assert.Equal(a.Id, b.DuplicateOfId);
     }
 
     [Theory]
-    [InlineData(300, "Swiggy", "1234", 0)]   // other amount
-    [InlineData(250, "Zomato", "1234", 0)]   // other merchant
-    [InlineData(250, "Swiggy", "9999", 0)]   // other account
-    [InlineData(250, "Swiggy", "1234", 1)]   // other day
-    public void Near_misses_are_not_duplicates(decimal amount, string merchant, string account, int dayOffset)
+    [InlineData(300, "Swiggy", 0, TransactionType.Expense)]   // other amount
+    [InlineData(250, "Zomato", 0, TransactionType.Expense)]   // other merchant
+    [InlineData(250, "Swiggy", 1, TransactionType.Expense)]   // other day
+    [InlineData(250, "Swiggy", 0, TransactionType.Income)]    // other direction
+    [InlineData(250, "", 0, TransactionType.Expense)]         // unknown merchant: too little to call it a duplicate
+    public void Near_misses_are_not_duplicates(decimal amount, string merchant, int dayOffset, TransactionType type)
     {
         var a = Tx(250, TransactionType.Expense);
-        var b = Tx(amount, TransactionType.Expense, merchant, account, date: D.AddDays(dayOffset));
+        var b = Tx(amount, type, merchant, D.AddDays(dayOffset));
         Run([b], a);
+        Assert.Null(b.DuplicateOfId);
+    }
+
+    [Fact]
+    public void Two_unknown_merchants_are_never_duplicates()
+    {
+        var a = Tx(500, TransactionType.Income, "");
+        var b = Tx(500, TransactionType.Income, "");
+        Run([a, b]);
         Assert.Null(b.DuplicateOfId);
     }
 
@@ -122,7 +108,7 @@ public class TransactionReconcilerTests
     {
         var expense = Tx(250, TransactionType.Expense, date: D);
         expense.Category = "Shopping";
-        var refund = Tx(250, TransactionType.Income, "SWIGGY", date: D.AddDays(3), refund: true);
+        var refund = Tx(250, TransactionType.Income, "SWIGGY", D.AddDays(3), refund: true);
         Run([refund], expense);
 
         Assert.Equal(expense.Id, refund.RefundOfId);
@@ -133,8 +119,8 @@ public class TransactionReconcilerTests
     public void One_expense_is_refunded_only_once()
     {
         var expense = Tx(250, TransactionType.Expense);
-        var r1 = Tx(250, TransactionType.Income, date: D.AddDays(1), refund: true, reference: "RF1111111");
-        var r2 = Tx(250, TransactionType.Income, date: D.AddDays(2), refund: true, reference: "RF2222222");
+        var r1 = Tx(250, TransactionType.Income, date: D.AddDays(1), refund: true);
+        var r2 = Tx(250, TransactionType.Income, date: D.AddDays(2), refund: true);
         Run([r1, r2], expense);
 
         Assert.Equal(expense.Id, r1.RefundOfId);
@@ -150,96 +136,41 @@ public class TransactionReconcilerTests
     public void Refund_that_does_not_match_stays_unlinked(decimal amount, string merchant, int days)
     {
         var expense = Tx(250, TransactionType.Expense);
-        var refund = Tx(amount, TransactionType.Income, merchant, date: D.AddDays(days), refund: true);
+        var refund = Tx(amount, TransactionType.Income, merchant, D.AddDays(days), refund: true);
         Run([refund], expense);
         Assert.Null(refund.RefundOfId);
     }
 
     [Fact]
-    public void Matching_debit_and_credit_on_two_own_accounts_become_a_transfer()
+    public void Transfers_are_never_marked_automatically()
     {
-        var debit = Tx(5000, TransactionType.Expense, "", "1234");
-        var credit = Tx(5000, TransactionType.Income, "", "5678", date: D.AddDays(1));
+        var debit = Tx(5000, TransactionType.Expense, "");
+        var credit = Tx(5000, TransactionType.Income, "", D.AddDays(1));
         Run([debit, credit]);
 
-        Assert.True(debit.IsTransfer);
-        Assert.True(credit.IsTransfer);
-        Assert.Equal("Transfers", debit.Category);
-    }
-
-    [Fact]
-    public void Transfer_pairs_with_an_already_stored_row()
-    {
-        var stored = Tx(5000, TransactionType.Expense, "", "1234");
-        var credit = Tx(5000, TransactionType.Income, "", "5678");
-        Run([credit], stored);
-
-        Assert.True(stored.IsTransfer);
-        Assert.True(credit.IsTransfer);
-    }
-
-    [Fact]
-    public void Ambiguous_candidates_are_not_marked_as_transfers()
-    {
-        var debit = Tx(5000, TransactionType.Expense, "", "1234");
-        var credit1 = Tx(5000, TransactionType.Income, "", "5678");
-        var credit2 = Tx(5000, TransactionType.Income, "", "9012");
-        Run([debit, credit1, credit2]);
-
         Assert.False(debit.IsTransfer);
-        Assert.False(credit1.IsTransfer);
-        Assert.False(credit2.IsTransfer);
+        Assert.False(credit.IsTransfer);
     }
 
     [Fact]
-    public void Same_account_or_unknown_account_is_never_a_transfer()
+    public void A_manual_category_is_kept_when_marked_as_a_transfer()
     {
-        var debit = Tx(5000, TransactionType.Expense, "", "1234");
-        var sameAcct = Tx(5000, TransactionType.Income, "", "1234");
-        var noAcct = Tx(5000, TransactionType.Income, "", null);
-        Run([debit, sameAcct, noAcct]);
+        var t = Tx(5000, TransactionType.Expense, "");
+        t.Category = "Rent";
+        t.CategoryIsManual = true;
+        TransactionReconciler.MarkTransfer(t);
 
-        Assert.False(debit.IsTransfer);
-        Assert.False(sameAcct.IsTransfer);
-        Assert.False(noAcct.IsTransfer);
-    }
-
-    [Fact]
-    public void A_manual_category_is_kept_on_a_transfer()
-    {
-        var debit = Tx(5000, TransactionType.Expense, "", "1234");
-        debit.Category = "Rent";
-        debit.CategoryIsManual = true;
-        var credit = Tx(5000, TransactionType.Income, "", "5678");
-        Run([credit], debit);
-
-        Assert.True(debit.IsTransfer);
-        Assert.Equal("Rent", debit.Category);
-    }
-
-    [Fact]
-    public void A_flagged_duplicate_does_not_take_part_in_transfers()
-    {
-        var debit = Tx(5000, TransactionType.Expense, "", "1234");
-        var credit = Tx(5000, TransactionType.Income, "", "5678");
-        var credit2 = Tx(5000, TransactionType.Income, "", "5678");   // same payment, second message
-        Run([debit, credit, credit2]);
-
-        Assert.Equal(credit.Id, credit2.DuplicateOfId);
-        Assert.False(credit2.IsTransfer);
-        Assert.True(debit.IsTransfer);
-        Assert.True(credit.IsTransfer);
+        Assert.True(t.IsTransfer);
+        Assert.Equal("Rent", t.Category);
     }
 }
 
 public class DataQualityServiceTests
 {
     private const string Swiggy = "Sent Rs.250.00 From HDFC Bank A/c *1234 To SWIGGY On 02/11/26 Ref 4567890123";
-    private const string SwiggyOtherMessageSameRef = "INR 250.00 debited from A/c XX1234 on 02-11-26 to SWIGGY. UPI Ref 4567890123";
-    private const string SwiggyOtherRef = "Sent Rs.250.00 From HDFC Bank A/c *1234 To SWIGGY On 02/11/26 Ref 9999999999";
+    private const string SwiggySecondMessage = "INR 250.00 debited from A/c XX1234 on 02-11-26 to SWIGGY. UPI Ref 4567890123";
+    private const string SwiggyOtherDay = "Sent Rs.250.00 From HDFC Bank A/c *1234 To SWIGGY On 03/11/26 Ref 9999999999";
     private const string Refund = "Refund of Rs 250.00 credited to A/c XX1234 on 05-11-26 from SWIGGY.";
-    private const string TransferOut = "Rs 5,000.00 debited from A/c XX1234 on 03-11-26 to A/c XX5678";
-    private const string TransferIn = "Rs 5,000.00 credited to A/c XX5678 on 03-11-26";
     private const string Garbage = "Hello, your parcel is out for delivery";
 
     private static readonly Guid Asha = Guid.NewGuid();
@@ -258,7 +189,7 @@ public class DataQualityServiceTests
         using var db = NewDb();
         var svc = Create(db);
         var r1 = await svc.ImportSmsAsync(Asha, [Swiggy]);
-        var r2 = await svc.ImportSmsAsync(Asha, [SwiggyOtherMessageSameRef]);
+        var r2 = await svc.ImportSmsAsync(Asha, [SwiggySecondMessage]);
 
         Assert.Equal(0, r1.PossibleDuplicates);
         Assert.Equal(1, r2.PossibleDuplicates);
@@ -268,11 +199,11 @@ public class DataQualityServiceTests
     }
 
     [Fact]
-    public async Task Two_real_purchases_with_different_references_are_both_clean()
+    public async Task Same_shop_on_another_day_is_a_separate_purchase()
     {
         using var db = NewDb();
         var svc = Create(db);
-        await svc.ImportSmsAsync(Asha, [Swiggy, SwiggyOtherRef]);
+        await svc.ImportSmsAsync(Asha, [Swiggy, SwiggyOtherDay]);
 
         Assert.All(await svc.ListAsync(Asha, null), t => Assert.Null(t.DuplicateOfId));
     }
@@ -283,7 +214,7 @@ public class DataQualityServiceTests
         using var db = NewDb();
         var svc = Create(db);
         await svc.ImportSmsAsync(Asha, [Swiggy]);
-        var r = await svc.ImportSmsAsync(Ravi, [SwiggyOtherMessageSameRef]);
+        var r = await svc.ImportSmsAsync(Ravi, [SwiggySecondMessage]);
 
         Assert.Equal(0, r.PossibleDuplicates);
         Assert.All(await svc.ListAsync(Ravi, null), t => Assert.Null(t.DuplicateOfId));
@@ -294,11 +225,11 @@ public class DataQualityServiceTests
     {
         using var db = NewDb();
         var svc = Create(db);
-        await svc.ImportSmsAsync(Asha, [Swiggy, SwiggyOtherMessageSameRef]);
+        await svc.ImportSmsAsync(Asha, [Swiggy, SwiggySecondMessage]);
         var flagged = (await svc.ListAsync(Asha, null)).Single(t => t.DuplicateOfId is not null);
 
         Assert.Equal(TransactionActionResult.Done, await svc.ClearDuplicateAsync(Asha, flagged.Id));
-        await svc.ImportSmsAsync(Asha, [Swiggy, SwiggyOtherMessageSameRef]);   // re-import is a no-op
+        await svc.ImportSmsAsync(Asha, [Swiggy, SwiggySecondMessage]);   // re-import is a no-op
 
         Assert.All(await svc.ListAsync(Asha, null), t => Assert.Null(t.DuplicateOfId));
     }
@@ -319,98 +250,52 @@ public class DataQualityServiceTests
     }
 
     [Fact]
-    public async Task Transfer_between_own_accounts_is_marked_on_both_rows()
+    public async Task User_can_mark_and_unmark_a_transfer()
     {
         using var db = NewDb();
         var svc = Create(db);
-        await svc.ImportSmsAsync(Asha, [TransferOut]);
-        await svc.ImportSmsAsync(Asha, [TransferIn]);
-
-        var rows = await svc.ListAsync(Asha, null);
-        Assert.Equal(2, rows.Count);
-        Assert.All(rows, t => { Assert.True(t.IsTransfer); Assert.Equal("Transfers", t.Category); });
-    }
-
-    [Fact]
-    public async Task User_can_unmark_and_mark_a_transfer()
-    {
-        using var db = NewDb();
-        var svc = Create(db);
-        await svc.ImportSmsAsync(Asha, [TransferOut, TransferIn]);
-        var id = (await svc.ListAsync(Asha, null))[0].Id;
-
-        await svc.SetTransferAsync(Asha, id, false);
-        var unmarked = (await svc.ListAsync(Asha, null)).Single(t => t.Id == id);
-        Assert.False(unmarked.IsTransfer);
-        Assert.NotEqual("Transfers", unmarked.Category);
+        await svc.ImportSmsAsync(Asha, [Swiggy]);
+        var id = (await svc.ListAsync(Asha, null)).Single().Id;
 
         await svc.SetTransferAsync(Asha, id, true);
-        Assert.True((await svc.ListAsync(Asha, null)).Single(t => t.Id == id).IsTransfer);
+        var marked = (await svc.ListAsync(Asha, null)).Single();
+        Assert.True(marked.IsTransfer);
+        Assert.Equal("Transfers", marked.Category);
+
+        await svc.SetTransferAsync(Asha, id, false);
+        var unmarked = (await svc.ListAsync(Asha, null)).Single();
+        Assert.False(unmarked.IsTransfer);
+        Assert.Equal("Food & Dining", unmarked.Category);
     }
 
     [Fact]
-    public async Task Unparsed_messages_are_kept_for_review_once()
+    public async Task Unreadable_messages_are_reported_once_and_never_stored()
     {
         using var db = NewDb();
         var svc = Create(db);
-        await svc.ImportSmsAsync(Asha, [Garbage, Swiggy]);
-        await svc.ImportSmsAsync(Asha, ["  " + Garbage.ToUpperInvariant() + "  "]);
 
-        var list = await svc.ListUnparsedAsync(Asha);
-        Assert.Single(list);
-        Assert.Equal(Garbage, list[0].Text);
-        Assert.Empty(await svc.ListUnparsedAsync(Ravi));
+        var r = await svc.ImportSmsAsync(Asha, [Garbage, Swiggy]);
+
+        Assert.Single(r.Unparsed);
+        Assert.Equal(1, await db.Transactions.CountAsync());
+        Assert.DoesNotContain(db.Model.GetEntityTypes(), e => e.ClrType.Name.Contains("Unparsed"));
     }
 
     [Fact]
-    public async Task Stored_unparsed_text_is_capped_at_500_characters()
+    public async Task Stored_rows_hold_no_message_text_or_account_details()
     {
         using var db = NewDb();
-        var svc = Create(db);
-        await svc.ImportSmsAsync(Asha, ["hello " + new string('x', 1500)]);
+        await Create(db).ImportSmsAsync(Asha, [Swiggy]);
 
-        Assert.Equal(UnparsedMessage.MaxTextLength, (await svc.ListUnparsedAsync(Asha)).Single().Text.Length);
-    }
+        var columns = db.Model.FindEntityType(typeof(Transaction))!.GetProperties().Select(p => p.Name).ToHashSet();
 
-    [Fact]
-    public async Task Stored_unparsed_count_is_capped_per_user()
-    {
-        using var db = NewDb();
-        var svc = Create(db);
-        await svc.ImportSmsAsync(Asha, Enumerable.Range(0, 250).Select(i => $"junk message {i}").Take(TransactionService.MaxMessages).ToList());
-
-        Assert.Equal(TransactionService.MaxStoredUnparsedPerUser, (await svc.ListUnparsedAsync(Asha)).Count);
-    }
-
-    [Fact]
-    public async Task A_message_that_parses_later_leaves_the_review_list()
-    {
-        using var db = NewDb();
-        var svc = Create(db);
-        db.UnparsedMessages.Add(new UnparsedMessage
-        {
-            UserId = Asha, Text = Swiggy,
-            RawHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Swiggy.ToLowerInvariant()))),
-        });
-        await db.SaveChangesAsync();
-
-        await svc.ImportSmsAsync(Asha, [Swiggy]);
-
-        Assert.Empty(await svc.ListUnparsedAsync(Asha));
-    }
-
-    [Fact]
-    public async Task Dismiss_removes_only_the_owners_message()
-    {
-        using var db = NewDb();
-        var svc = Create(db);
-        await svc.ImportSmsAsync(Asha, [Garbage]);
-        var id = (await svc.ListUnparsedAsync(Asha)).Single().Id;
-
-        Assert.Equal(TransactionActionResult.NotFound, await svc.DismissUnparsedAsync(Ravi, id));
-        Assert.Single(await svc.ListUnparsedAsync(Asha));
-        Assert.Equal(TransactionActionResult.Done, await svc.DismissUnparsedAsync(Asha, id));
-        Assert.Empty(await svc.ListUnparsedAsync(Asha));
+        Assert.DoesNotContain("Account", columns);
+        Assert.DoesNotContain("Reference", columns);
+        Assert.DoesNotContain("Text", columns);
+        Assert.DoesNotContain("Body", columns);
+        var row = await db.Transactions.SingleAsync();
+        Assert.DoesNotContain("1234", row.Merchant + row.Category);
+        Assert.DoesNotContain("4567890123", row.Merchant + row.Category);
     }
 
     [Fact]
@@ -418,9 +303,8 @@ public class DataQualityServiceTests
     {
         using var db = NewDb();
         var svc = Create(db);
-        await svc.ImportSmsAsync(Asha, [Swiggy, SwiggyOtherMessageSameRef]);
-        var rows = await svc.ListAsync(Asha, null);
-        var original = rows.Single(t => t.DuplicateOfId is null);
+        await svc.ImportSmsAsync(Asha, [Swiggy, SwiggySecondMessage]);
+        var original = (await svc.ListAsync(Asha, null)).Single(t => t.DuplicateOfId is null);
 
         Assert.Equal(TransactionActionResult.Done, await svc.DeleteAsync(Asha, original.Id));
 

@@ -7,8 +7,6 @@ public record ParsedTransaction(
     TransactionType Type,
     DateOnly Date,
     string? Merchant,
-    string? Account,
-    string? Reference = null,
     bool IsRefund = false);
 
 public interface ITransactionParser

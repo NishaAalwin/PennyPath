@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
+import SummaryPanel from './SummaryPanel'
 import {
-  deleteTransaction, dismissUnparsed, importSms, listCategories, listTransactions, listUnparsed, notDuplicate,
-  setCategory, setTransfer, splitMessages, type ImportResult, type Transaction, type UnparsedMessage,
+  deleteTransaction, getSummary, importSms, listCategories, listTransactions, notDuplicate,
+  setCategory, setTransfer, splitMessages, type ImportResult, type MonthlySummary, type Transaction,
 } from './transactions'
 
 type Props = { token: string; onSessionExpired: () => void }
@@ -15,7 +16,8 @@ export default function Transactions({ token, onSessionExpired }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [categories, setCategories] = useState<string[]>([])
-  const [review, setReview] = useState<UnparsedMessage[]>([])
+  const [summary, setSummary] = useState<MonthlySummary | null>(null)
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
 
   const handleError = useCallback(
     (e: unknown) => {
@@ -26,8 +28,8 @@ export default function Transactions({ token, onSessionExpired }: Props) {
   )
 
   const refresh = useCallback(
-    () => Promise.all([listTransactions(token).then(setRows), listUnparsed(token).then(setReview)]).catch(handleError),
-    [token, handleError],
+    () => Promise.all([listTransactions(token).then(setRows), getSummary(token, month).then(setSummary)]).catch(handleError),
+    [token, month, handleError],
   )
 
   useEffect(() => {
@@ -65,8 +67,10 @@ export default function Transactions({ token, onSessionExpired }: Props) {
 
   return (
     <section style={{ display: 'grid', gap: '0.75rem' }}>
+      <SummaryPanel summary={summary} month={month} onMonthChange={setMonth} />
+
       <h2>Import SMS</h2>
-      <p style={{ margin: 0 }}>Paste your bank SMS messages here, with a blank line between messages.</p>
+      <p style={{ margin: 0 }}>Paste your bank SMS messages here, with a blank line between messages. Only the amount, where it was spent, the date and whether it was money in or out are saved. The message text is not stored.</p>
       <textarea rows={6} value={text} onChange={(e) => setText(e.target.value)}
         placeholder="Sent Rs.250.00 From HDFC Bank A/c *1234 To SWIGGY On 02/11/26" />
       <button onClick={submit} disabled={busy}>{busy ? 'Importing...' : 'Import'}</button>
@@ -80,23 +84,9 @@ export default function Transactions({ token, onSessionExpired }: Props) {
       )}
       {result && result.unparsed.length > 0 && (
         <details>
-          <summary>Messages that were not recognised</summary>
+          <summary>Messages that were not recognised (shown now only, not saved)</summary>
           <ul>{result.unparsed.map((m, i) => <li key={i}>{m}</li>)}</ul>
         </details>
-      )}
-
-      {review.length > 0 && (
-        <>
-          <h2>Needs review ({review.length})</h2>
-          <p style={{ margin: 0 }}>These messages could not be read. Add them by hand or dismiss them; dismissing deletes the saved text.</p>
-          <ul style={{ margin: 0 }}>
-            {review.map((m) => (
-              <li key={m.id}>
-                {m.text} <button onClick={() => act(() => dismissUnparsed(token, m.id))}>Dismiss</button>
-              </li>
-            ))}
-          </ul>
-        </>
       )}
 
       <h2>Transactions</h2>

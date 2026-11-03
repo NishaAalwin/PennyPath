@@ -5,6 +5,7 @@ From `docs/requirements.md` §6.
 | NFR | Target | Current |
 |---|---|---|
 | Security | encrypted tokens at rest, HTTPS, no raw email bodies stored, "delete my data" | partial — see [[Security checklist]] |
+| Data minimisation | only amount, where/what, date, debit/credit stored in PostgreSQL; no account/reference numbers, balances or message text | done, see [[Data minimisation]] |
 | Privacy | only transaction-like emails read (sender + keyword filter) | n/a until [[M2 Gmail import]] |
 | Performance | dashboard < 2 s for 10k transactions | unmeasured |
 | Quality | ≥ 70% unit-test coverage on parser and services | unmeasured |

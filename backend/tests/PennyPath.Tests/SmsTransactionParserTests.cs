@@ -9,13 +9,13 @@ public class SmsTransactionParserTests
     private readonly SmsTransactionParser _p = new();
 
     [Theory]
-    [InlineData("Sent Rs.250.00 From HDFC Bank A/c *1234 To SWIGGY On 02/11/26 Ref 4567890123", 250.00, TransactionType.Expense, "Swiggy", "1234", "2026-11-02")]
-    [InlineData("Rs 450 spent on card XX9876 at AMAZON on 02-Nov-26. Avl bal Rs 12,000.00", 450, TransactionType.Expense, "Amazon", "9876", "2026-11-02")]
-    [InlineData("Dear Customer, Rs. 15,000.00 credited to your A/c XX5678 on 01-11-2026 by salary", 15000, TransactionType.Income, "salary", "5678", "2026-11-01")]
-    [InlineData("INR 1,299.00 debited from A/c XX4321 on 28-10-26 towards NETFLIX. Available balance INR 5,000", 1299, TransactionType.Expense, "Netflix", "4321", "2026-10-28")]
-    [InlineData("Rs.500.00 credited to a/c **2222 on 30-10-26 from RAHUL SHARMA. UPI Ref 998877", 500, TransactionType.Income, "Rahul Sharma", "2222", "2026-10-30")]
-    [InlineData("₹320 paid to VPA zomato@okicici on 25 Oct 2026", 320, TransactionType.Expense, "zomato", null, "2026-10-25")]
-    public void Parses_common_bank_messages(string sms, double amount, TransactionType type, string? merchant, string? account, string date)
+    [InlineData("Sent Rs.250.00 From HDFC Bank A/c *1234 To SWIGGY On 02/11/26 Ref 4567890123", 250.00, TransactionType.Expense, "Swiggy", "2026-11-02")]
+    [InlineData("Rs 450 spent on card XX9876 at AMAZON on 02-Nov-26. Avl bal Rs 12,000.00", 450, TransactionType.Expense, "Amazon", "2026-11-02")]
+    [InlineData("Dear Customer, Rs. 15,000.00 credited to your A/c XX5678 on 01-11-2026 by salary", 15000, TransactionType.Income, "salary", "2026-11-01")]
+    [InlineData("INR 1,299.00 debited from A/c XX4321 on 28-10-26 towards NETFLIX. Available balance INR 5,000", 1299, TransactionType.Expense, "Netflix", "2026-10-28")]
+    [InlineData("Rs.500.00 credited to a/c **2222 on 30-10-26 from RAHUL SHARMA. UPI Ref 998877", 500, TransactionType.Income, "Rahul Sharma", "2026-10-30")]
+    [InlineData("₹320 paid to VPA zomato@okicici on 25 Oct 2026", 320, TransactionType.Expense, "zomato", "2026-10-25")]
+    public void Parses_common_bank_messages(string sms, double amount, TransactionType type, string? merchant, string date)
     {
         var r = _p.Parse(sms, Fallback);
 
@@ -23,7 +23,6 @@ public class SmsTransactionParserTests
         Assert.Equal((decimal)amount, r.Amount);
         Assert.Equal(type, r.Type);
         Assert.Equal(merchant, r.Merchant);
-        Assert.Equal(account, r.Account);
         Assert.Equal(DateOnly.Parse(date), r.Date);
     }
 

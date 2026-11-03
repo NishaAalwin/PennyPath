@@ -25,7 +25,7 @@ PennyPath/
 ## 3. Data model
 - **User**(Id, Email, PasswordHash, CreatedAt)
 - **ConnectedSource**(Id, UserId, Type[Gmail|Sms], EncryptedRefreshToken, LastSyncAt)
-- **Transaction**(Id, UserId, Date, Amount, Type[Income|Expense], Merchant, CategoryId, Account, Source[Email|Sms|Manual], ExternalId, RawHash)
+- **Transaction**(Id, UserId, Date, Amount, Type[Income|Expense], Merchant, Category, CategoryIsManual, Source[Email|Sms|Manual], IsRefund, RefundOfId, DuplicateOfId, IsTransfer, RawHash). No account number, reference number or message text is stored (user decision, 2026-11-03).
   - unique on (UserId, RawHash) to prevent duplicates
 - **Category**(Id, UserId nullable, Name, Icon)
 - **MerchantRule**(Id, UserId, MerchantPattern, CategoryId) for learned corrections

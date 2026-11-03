@@ -27,13 +27,13 @@ PennyPath is a personal finance app. It reads a person's bank/payment emails (Gm
 ### MVP (v0.1): Must have
 - M1. Sign up and log in (JWT).
 - M2. Connect Gmail (OAuth, read-only) and import bank/UPI/card transaction emails.
-- M3. Parser extracts amount, debit/credit, merchant, date and account from emails.
+- M3. Parser extracts amount, debit/credit, merchant (where/what) and date from emails. It does not read account numbers, reference numbers or balances.
 - M4. Manual SMS import (paste or upload a file) that uses the same parser as emails.
 - M5. Auto-categorize transactions (rules first, AI fallback), and let the user correct a category.
 - M6. Monthly dashboard with total income, total expense, savings, category breakdown and trend.
 - M7. Transaction list with search, filter and edit.
 - M8. Deployed with Docker and a CI pipeline (also a continuous requirement: CI stays green on every commit).
-- M9. Data quality: cross-source duplicate detection (SMS vs email), own-account transfers excluded from income and expense, refunds and reversals handled, and unparseable messages kept in a "needs review" list instead of being dropped.
+- M9. Data quality: cross-source duplicate detection (SMS vs email), own-account transfers (marked by the user) excluded from income and expense, refunds and reversals handled, and unparseable messages reported to the user at import time (their text is not stored).
 - M10. Account lifecycle: email verification, password reset, and "delete my account and all my data".
 - M11. Manual add of a transaction (fallback when the parser fails).
 - M12. Security gate before M2: HTTPS, safer token storage, consent screen for AI use, and the open items in `docs/security.md` that are marked as blocking Gmail.
@@ -53,6 +53,7 @@ Direct bank API integration, actually executing investments, iOS SMS reading, mu
 
 ## 6. Non-functional requirements
 - Security: encrypted tokens at rest, HTTPS, no raw email bodies stored (store only parsed fields), and "delete my data" support.
+- Data minimisation (user decision, 2026-11-03): only amount, where/what (merchant), date and debit/credit are read and stored, in PostgreSQL. No account numbers, reference numbers, balances or message text are stored; only a hash of the message is kept to skip re-imports.
 - Privacy: only transaction-like emails are read (filtered by sender and keywords).
 - Performance: dashboard loads in under 2 seconds for 10k transactions, measured on the Docker Compose stack on a developer laptop (state the hardware in `docs/verification.md`).
 - Quality: at least 70% unit test coverage on the parser and services, measured in CI.
@@ -70,7 +71,7 @@ Direct bank API integration, actually executing investments, iOS SMS reading, mu
 - **M5:** Given a transaction, when it is imported, then it gets a category (rule first, AI only if I opted in); when I change the category, then the change is kept and not overwritten on later imports.
 - **M6:** Given imported transactions, when I open the dashboard for a month, then income, expense, savings and category totals match the transaction list exactly.
 - **M7:** Given 10k transactions, when I search, filter by date, category or type, or edit a transaction, then the list updates correctly and only my own transactions are affected.
-- **M9:** Given the same payment arrives by SMS and by email, then it appears once; given a transfer between my own accounts, then it is not counted as income or expense; given a refund, then it reduces the matching expense.
+- **M9:** Given the same payment arrives by SMS and by email, then it appears once; given a payment I mark as a transfer between my own accounts, then it is not counted as income or expense; given a refund, then it reduces the matching expense.
 - **M10:** Given I request deletion, then my account, transactions and stored tokens are removed and cannot be recovered through the app.
 - **M11:** Given I add a transaction by hand, then it appears in the list and the dashboard like any other.
 
@@ -84,4 +85,5 @@ Direct bank API integration, actually executing investments, iOS SMS reading, mu
 7. Whether AI categorization is acceptable at all (recommended: opt-in, merchant text only).
 
 ## 9. Revision history
+- 2026-11-03: data minimisation: only amount, where/what, date and debit/credit are stored; account and reference numbers and unreadable-message text are no longer kept; automatic transfer detection removed (needed account numbers); monthly summary (M6) started.
 - 2026-11-03: added M9-M12, measurable accuracy and performance targets, acceptance criteria for every MVP item, open decisions 4-7 (from a requirements review).

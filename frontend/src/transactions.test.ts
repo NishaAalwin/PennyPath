@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { deleteTransaction, dismissUnparsed, listUnparsed, notDuplicate, setTransfer, importSms, listTransactions, setCategory, splitMessages } from './transactions'
+import { deleteTransaction, getSummary, notDuplicate, setTransfer, importSms, listTransactions, setCategory, splitMessages } from './transactions'
 
 const asFetch = (f: unknown) => f as unknown as typeof fetch
 
@@ -47,26 +47,25 @@ describe('transactions api', () => {
 
   const noContent = () => vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => { throw new Error('no body') } })
 
-  it('setTransfer, notDuplicate, deleteTransaction and dismissUnparsed use the right verbs and paths', async () => {
+  it('setTransfer, notDuplicate and deleteTransaction use the right verbs and paths', async () => {
     const f = noContent()
     await setTransfer('tok', 'a', true, asFetch(f))
     await notDuplicate('tok', 'b', asFetch(f))
     await deleteTransaction('tok', 'c', asFetch(f))
-    await dismissUnparsed('tok', 'd', asFetch(f))
 
     const calls = f.mock.calls.map(([url, init]) => [init.method, String(url).replace(/^.*?\/api/, '/api')])
     expect(calls).toEqual([
       ['PUT', '/api/transactions/a/transfer'],
       ['POST', '/api/transactions/b/not-duplicate'],
       ['DELETE', '/api/transactions/c'],
-      ['DELETE', '/api/review/unparsed/d'],
     ])
     expect(JSON.parse(f.mock.calls[0][1].body)).toEqual({ isTransfer: true })
   })
 
-  it('listUnparsed returns the needs-review messages', async () => {
-    const f = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [{ id: '1', text: 'x', createdAt: 'now' }] })
-    expect(await listUnparsed('tok', asFetch(f))).toHaveLength(1)
-    expect(f.mock.calls[0][0]).toMatch(/\/api\/review\/unparsed$/)
+  it('getSummary asks for the month and returns the summary', async () => {
+    const body = { month: '2026-11', income: 1, expense: 2, savings: -1, byCategory: [], byMerchant: [], counted: 3, excluded: 0 }
+    const f = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => body })
+    expect(await getSummary('tok', '2026-11', asFetch(f))).toEqual(body)
+    expect(f.mock.calls[0][0]).toMatch(/\/api\/summary\?month=2026-11$/)
   })
 })

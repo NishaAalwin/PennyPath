@@ -1,11 +1,12 @@
-using PennyPath.Application.Categorization;
 using PennyPath.Domain.Entities;
 
 namespace PennyPath.Application.Reconciliation;
 
 /// <summary>
-/// Flags duplicates, links refunds and pairs own-account transfers among freshly imported rows and the
-/// user's existing rows. It only sets flags (nothing is deleted), so every decision can be undone by the user.
+/// Flags duplicates and links refunds among freshly imported rows and the user's existing rows, using only the
+/// stored fields (date, amount, direction, merchant). It only sets flags (nothing is deleted), so every
+/// decision can be undone by the user. Own-account transfers are marked by the user: telling them apart
+/// automatically needs account numbers, which are deliberately not read.
 /// </summary>
 public static class TransactionReconciler
 {
@@ -25,14 +26,6 @@ public static class TransactionReconciler
             else if (t.IsRefund) LinkRefund(t, pool);
             pool.Add(t);
         }
-
-        foreach (var t in fresh.Where(t => t.DuplicateOfId is null && !t.IsRefund && !t.IsTransfer))
-        {
-            var partner = UniquePartner(t, pool);
-            if (partner is null || UniquePartner(partner, pool) != t) continue;
-            MarkTransfer(t);
-            MarkTransfer(partner);
-        }
     }
 
     public static void MarkTransfer(Transaction t)
@@ -41,16 +34,11 @@ public static class TransactionReconciler
         if (!t.CategoryIsManual) t.Category = TransferCategory;
     }
 
-    private static bool IsDuplicate(Transaction a, Transaction b)
-    {
-        if (a.Id == b.Id || a.Type != b.Type || a.Amount != b.Amount) return false;
-
-        // Two different reference numbers mean two real payments; the same number means the same payment.
-        if (!string.IsNullOrEmpty(a.Reference) && !string.IsNullOrEmpty(b.Reference))
-            return string.Equals(a.Reference, b.Reference, StringComparison.OrdinalIgnoreCase);
-
-        return a.Date == b.Date && AccountsCompatible(a, b) && MerchantsCompatible(a, b);
-    }
+    /// <summary>Same direction, amount, day and a known, identical merchant: probably two messages about one payment.</summary>
+    private static bool IsDuplicate(Transaction a, Transaction b) =>
+        a.Id != b.Id && a.Type == b.Type && a.Amount == b.Amount && a.Date == b.Date
+        && !string.IsNullOrWhiteSpace(a.Merchant)
+        && string.Equals(a.Merchant, b.Merchant, StringComparison.OrdinalIgnoreCase);
 
     private static void LinkRefund(Transaction refund, List<Transaction> pool)
     {
@@ -69,23 +57,4 @@ public static class TransactionReconciler
         refund.RefundOfId = expense.Id;
         if (!refund.CategoryIsManual) refund.Category = expense.Category;
     }
-
-    private static Transaction? UniquePartner(Transaction t, List<Transaction> pool)
-    {
-        var candidates = pool.Where(o => IsTransferPartner(t, o)).Take(2).ToList();
-        return candidates.Count == 1 ? candidates[0] : null;
-    }
-
-    private static bool IsTransferPartner(Transaction a, Transaction b) =>
-        a.Id != b.Id && a.Type != b.Type && a.Amount == b.Amount
-        && Math.Abs(a.Date.DayNumber - b.Date.DayNumber) <= 1
-        && !string.IsNullOrEmpty(a.Account) && !string.IsNullOrEmpty(b.Account) && a.Account != b.Account
-        && !b.IsTransfer && !b.IsRefund && b.DuplicateOfId is null;
-
-    private static bool AccountsCompatible(Transaction a, Transaction b) =>
-        string.IsNullOrEmpty(a.Account) || string.IsNullOrEmpty(b.Account) || a.Account == b.Account;
-
-    private static bool MerchantsCompatible(Transaction a, Transaction b) =>
-        string.IsNullOrWhiteSpace(a.Merchant) || string.IsNullOrWhiteSpace(b.Merchant)
-        || string.Equals(a.Merchant, b.Merchant, StringComparison.OrdinalIgnoreCase);
 }

@@ -6,7 +6,7 @@ verified: 37 backend tests on samples; real-message accuracy NOT measured
 ---
 # M3 Parser extracts transaction fields
 
-**Requirement:** extract amount, debit/credit, merchant, date, account from bank messages (emails and SMS).
+**Requirement:** extract amount, debit/credit, merchant (where/what) and date from bank messages (emails and SMS). Account numbers, references and balances are deliberately **not** extracted ([[Data minimisation]]).
 
 ## Code check
 - [x] Rule-based parser — `backend/src/PennyPath.Application/Parsing/SmsTransactionParser.cs`, result type `ParsedTransaction.cs`

@@ -17,7 +17,6 @@ verified: e2e on samples
 - [ ] File upload (only paste is built)
 - [ ] Duplicate re-import is skipped (confirm in `TransactionService.cs` + tests)
 - [x] Raw SMS text not retained for **parsed** messages: `Transaction` stores only parsed fields plus a SHA-256 of the text
-- [x] Unreadable messages are kept for review only (≤ 500 chars, ≤ 200 per user, deletable) — deliberate exception, see [[M9 Data quality]]
-- [x] Unreadable messages are listed again in the needs-review panel instead of vanishing after import
+- [x] Unreadable messages are shown once in the import result and **not stored** ([[Data minimisation]]; the earlier needs-review list was removed)
 
 Related: [[Security checklist]]

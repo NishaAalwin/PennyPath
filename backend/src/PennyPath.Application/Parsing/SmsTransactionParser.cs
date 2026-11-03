@@ -43,8 +43,6 @@ public partial class SmsTransactionParser : ITransactionParser
             type.Value,
             FindDate(t) ?? fallbackDate,
             merchant,
-            FindAccount(t),
-            FindReference(t),
             isRefund);
     }
 
@@ -99,24 +97,8 @@ public partial class SmsTransactionParser : ITransactionParser
             : name;
     }
 
-    private static string? FindReference(string t)
-    {
-        var m = ReferenceRx().Match(t);
-        return m.Success ? m.Groups["r"].Value : null;
-    }
-
-    private static string? FindAccount(string t)
-    {
-        var m = AccountRx().Match(t);
-        return m.Success ? m.Groups["n"].Value : null;
-    }
-
     [GeneratedRegex(@"\b(?:refund(?:ed)?|reversal|reversed)\b")]
     private static partial Regex RefundRx();
-
-    // "Ref 4567890123", "UPI Ref No. 998877", "UTR: AB123456789"; the value must contain a digit.
-    [GeneratedRegex(@"\b(?:reference|ref|utr|rrn|txn)(?![A-Za-z])\s*(?:no\.?|number|id)?\s*[:#.\-]?\s*(?<r>(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{6,30})", RegexOptions.IgnoreCase)]
-    private static partial Regex ReferenceRx();
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex Whitespace();
@@ -135,6 +117,4 @@ public partial class SmsTransactionParser : ITransactionParser
     [GeneratedRegex(@"\b(?:from|by)\s+(?!a/c|acct|account|your|card|the)(?<m>[A-Za-z0-9&@_][A-Za-z0-9&.@_ \-]{1,38}?)(?=\s+(?:on|ref|via|using|upi|avl|bal|info|txn|utr|to)\b|\s*[.,(]|\s*$)", RegexOptions.IgnoreCase)]
     private static partial Regex PayerRx();
 
-    [GeneratedRegex(@"(?:a/c|acct|account|card)(?:\s*no\.?)?\s*(?:ending\s*(?:with\s*)?)?[xX*]*\s*(?<n>\d{3,6})", RegexOptions.IgnoreCase)]
-    private static partial Regex AccountRx();
 }

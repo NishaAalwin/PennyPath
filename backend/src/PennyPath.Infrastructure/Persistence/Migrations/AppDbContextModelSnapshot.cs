@@ -28,10 +28,6 @@ namespace PennyPath.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Account")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -69,10 +65,6 @@ namespace PennyPath.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
-                    b.Property<string>("Reference")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
                     b.Property<Guid?>("RefundOfId")
                         .HasColumnType("uuid");
 
@@ -99,36 +91,6 @@ namespace PennyPath.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "Amount", "Date");
 
                     b.ToTable("Transactions");
-                });
-
-            modelBuilder.Entity("PennyPath.Domain.Entities.UnparsedMessage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RawHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("Text")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "RawHash")
-                        .IsUnique();
-
-                    b.ToTable("UnparsedMessages");
                 });
 
             modelBuilder.Entity("PennyPath.Domain.Entities.User", b =>
@@ -164,15 +126,6 @@ namespace PennyPath.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("PennyPath.Domain.Entities.Transaction", b =>
-                {
-                    b.HasOne("PennyPath.Domain.Entities.User", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("PennyPath.Domain.Entities.UnparsedMessage", b =>
                 {
                     b.HasOne("PennyPath.Domain.Entities.User", null)
                         .WithMany()

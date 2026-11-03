@@ -16,11 +16,7 @@ public class Transaction
 
     /// <summary>True once the user chose the category; automatic categorization never changes such a row.</summary>
     public bool CategoryIsManual { get; set; }
-    public string? Account { get; set; }
     public TransactionSource Source { get; set; }
-
-    /// <summary>Bank reference (UTR/Ref no.) when the message has one; the same reference means the same payment.</summary>
-    public string? Reference { get; set; }
 
     /// <summary>A refund or reversal. It offsets the expense it links to and must not count as income.</summary>
     public bool IsRefund { get; set; }

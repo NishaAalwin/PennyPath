@@ -46,16 +46,21 @@ public class TransactionsController(ITransactionService transactions) : Controll
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct) =>
         Result(await transactions.DeleteAsync(UserId, id, ct));
 
-    [HttpGet("api/review/unparsed")]
-    public async Task<IActionResult> Unparsed(CancellationToken ct) =>
-        Ok(await transactions.ListUnparsedAsync(UserId, ct));
-
-    [HttpDelete("api/review/unparsed/{id:guid}")]
-    public async Task<IActionResult> DismissUnparsed(Guid id, CancellationToken ct) =>
-        Result(await transactions.DismissUnparsedAsync(UserId, id, ct));
-
     private IActionResult Result(TransactionActionResult r) =>
         r == TransactionActionResult.Done ? NoContent() : NotFound();
+
+    [HttpGet("api/summary")]
+    public async Task<IActionResult> Summary([FromQuery] string? month, CancellationToken ct)
+    {
+        try
+        {
+            return Ok(await transactions.SummaryAsync(UserId, month, ct));
+        }
+        catch (ArgumentException)
+        {
+            return BadRequest(new { error = "month must be formatted yyyy-MM." });
+        }
+    }
 
     [HttpGet("api/transactions")]
     public async Task<IActionResult> List([FromQuery] string? month, CancellationToken ct)

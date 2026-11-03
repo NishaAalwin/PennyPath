@@ -1,3 +1,4 @@
+using PennyPath.Application.Summary;
 using PennyPath.Domain.Entities;
 
 namespace PennyPath.Application.Transactions;
@@ -8,10 +9,8 @@ public record ImportResult(int Imported, int Duplicates, IReadOnlyList<string> U
 
 public record TransactionDto(
     Guid Id, DateOnly Date, decimal Amount, TransactionType Type,
-    string Merchant, string Category, string? Account, TransactionSource Source,
+    string Merchant, string Category, TransactionSource Source,
     bool IsTransfer, bool IsRefund, Guid? RefundOfId, Guid? DuplicateOfId);
-
-public record UnparsedDto(Guid Id, string Text, DateTime CreatedAt);
 
 public record SetTransferRequest(bool IsTransfer);
 
@@ -31,13 +30,13 @@ public interface ITransactionService
     /// <summary>Deletes the row and clears any flags in other rows that pointed at it.</summary>
     Task<TransactionActionResult> DeleteAsync(Guid userId, Guid transactionId, CancellationToken ct = default);
 
-    Task<IReadOnlyList<UnparsedDto>> ListUnparsedAsync(Guid userId, CancellationToken ct = default);
-    Task<TransactionActionResult> DismissUnparsedAsync(Guid userId, Guid id, CancellationToken ct = default);
-
     /// <summary>Sets the user's own category. Returns NotFound for another user's or a missing transaction.</summary>
     Task<CategoryUpdateResult> UpdateCategoryAsync(Guid userId, Guid transactionId, string? category, CancellationToken ct = default);
 
     Task<ImportResult> ImportSmsAsync(Guid userId, IReadOnlyList<string> messages, CancellationToken ct = default);
+
+    /// <summary>Income, expense, savings and totals by place and category for one month (default: current month).</summary>
+    Task<MonthlySummary> SummaryAsync(Guid userId, string? month, CancellationToken ct = default);
 
     /// <param name="month">Optional "yyyy-MM" filter.</param>
     Task<IReadOnlyList<TransactionDto>> ListAsync(Guid userId, string? month, CancellationToken ct = default);

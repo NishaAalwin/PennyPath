@@ -2,6 +2,14 @@
 
 Newest first. One entry per task: date · task · notes checked · result · gaps.
 
+## 2026-11-03 · Data minimisation + monthly summary (user request)
+- User request: read only amount and where/what, summarise it, save in PostgreSQL. Decisions with the user: keep amount, where/what, date, debit/credit; stop storing unreadable messages; summary = totals by where/what (M6).
+- Notes checked: [[Data minimisation]] (new), [[M6 Monthly dashboard]], [[M9 Data quality]] (revised), [[M3 Transaction parser]], [[M4 SMS import]], [[Security checklist]], [[Non-functional requirements]].
+- Result: **pass, with gaps.** Backend 119 tests, frontend 14 tests, lint, build, `npm audit` (high) clean. Live on compose Postgres: migration `MinimiseStoredData` upgraded a DB that held old rows; psql shows no `UnparsedMessages` table and no `Account`/`Reference` columns; stored rows hold only amount/merchant/date/type/category/flags/hash. Summary checked by hand: 15,000 income, 600 spent (Swiggy 250 duplicate excluded, Amazon 450 − 100 refund), 14,400 saved; bad month 400; no token 401.
+- Security walk: new `/api/summary` is `[Authorize]`, owner from token, owner-scoped (tests); fewer data kept; no new dependencies.
+- Reverses the M9 exception (stored unreadable text) and drops automatic transfer detection; both recorded.
+- Gaps: no trend/charts, performance unmeasured, hash of message still stored (HMAC suggested), merchant text may carry names, UI not browser-tested, cross-source dedupe untested.
+
 ## 2026-11-03 · M9 data quality
 - Notes checked: [[M9 Data quality]], [[M4 SMS import]], [[M3 Transaction parser]], [[M5 Categorization]] (refund/transfer set categories), [[M6 Monthly dashboard]] (rules recorded), [[Security checklist]], [[Non-functional requirements]].
 - Result: **pass, with gaps.** Backend 117 tests, frontend 14 tests, lint, build, `npm audit` (high) clean; NuGet scan clean (no new packages). Live on compose Postgres: migration `AddDataQuality` applied; same-ref second message flagged (possibleDuplicates 1); different ref not flagged; refund linked to purchase; transfer pair marked on both rows; unreadable message listed; other user 404, no token 401.

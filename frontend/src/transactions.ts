@@ -7,7 +7,6 @@ export type Transaction = {
   type: 'Income' | 'Expense'
   merchant: string
   category: string
-  account: string | null
   source: string
   isTransfer: boolean
   isRefund: boolean
@@ -15,7 +14,18 @@ export type Transaction = {
   duplicateOfId: string | null
 }
 
-export type UnparsedMessage = { id: string; text: string; createdAt: string }
+export type SummaryLine = { name: string; amount: number }
+
+export type MonthlySummary = {
+  month: string
+  income: number
+  expense: number
+  savings: number
+  byCategory: SummaryLine[]
+  byMerchant: SummaryLine[]
+  counted: number
+  excluded: number
+}
 
 export type ImportResult = { imported: number; duplicates: number; unparsed: string[]; possibleDuplicates: number }
 
@@ -62,8 +72,5 @@ export const notDuplicate = (token: string, id: string, fetchFn: Fetch = fetch) 
 export const deleteTransaction = (token: string, id: string, fetchFn: Fetch = fetch) =>
   authed<void>(token, `/api/transactions/${id}`, { method: 'DELETE' }, fetchFn)
 
-export const listUnparsed = (token: string, fetchFn: Fetch = fetch) =>
-  authed<UnparsedMessage[]>(token, '/api/review/unparsed', {}, fetchFn)
-
-export const dismissUnparsed = (token: string, id: string, fetchFn: Fetch = fetch) =>
-  authed<void>(token, `/api/review/unparsed/${id}`, { method: 'DELETE' }, fetchFn)
+export const getSummary = (token: string, month?: string, fetchFn: Fetch = fetch) =>
+  authed<MonthlySummary>(token, `/api/summary${month ? `?month=${month}` : ''}`, {}, fetchFn)
