@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { importSms, listTransactions, splitMessages, type ImportResult, type Transaction } from './transactions'
+import { importSms, listCategories, listTransactions, setCategory, splitMessages, type ImportResult, type Transaction } from './transactions'
 
 type Props = { token: string; onSessionExpired: () => void }
 
@@ -11,6 +11,7 @@ export default function Transactions({ token, onSessionExpired }: Props) {
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [categories, setCategories] = useState<string[]>([])
 
   const handleError = useCallback(
     (e: unknown) => {
@@ -27,7 +28,18 @@ export default function Transactions({ token, onSessionExpired }: Props) {
 
   useEffect(() => {
     refresh()
-  }, [refresh])
+    listCategories(token).then(setCategories).catch(handleError)
+  }, [refresh, token, handleError])
+
+  async function changeCategory(id: string, category: string) {
+    setError(null)
+    try {
+      await setCategory(token, id, category)
+      await refresh()
+    } catch (e) {
+      handleError(e)
+    }
+  }
 
   async function submit() {
     const messages = splitMessages(text)
@@ -72,13 +84,19 @@ export default function Transactions({ token, onSessionExpired }: Props) {
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr><th align="left">Date</th><th align="left">Merchant</th><th align="right">Amount</th></tr>
+            <tr><th align="left">Date</th><th align="left">Merchant</th><th align="left">Category</th><th align="right">Amount</th></tr>
           </thead>
           <tbody>
             {rows.map((t) => (
               <tr key={t.id}>
                 <td>{t.date}</td>
                 <td>{t.merchant || '-'}</td>
+                <td>
+                  <select aria-label={`Category for ${t.merchant || 'transaction'}`} value={t.category}
+                    onChange={(e) => changeCategory(t.id, e.target.value)}>
+                    {(categories.length ? categories : [t.category]).map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </td>
                 <td align="right" style={{ color: t.type === 'Income' ? '#1b7f3b' : undefined }}>
                   {t.type === 'Income' ? '+' : '-'}{inr.format(t.amount)}
                 </td>

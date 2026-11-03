@@ -32,7 +32,7 @@ async function authed<T>(token: string, path: string, init: RequestInit, fetchFn
     const body = await res.json().catch(() => null)
     throw new ApiError(body?.error ?? 'Something went wrong.', res.status)
   }
-  return res.json()
+  return (res.status === 204 ? undefined : await res.json()) as T
 }
 
 export const importSms = (token: string, messages: string[], fetchFn: Fetch = fetch) =>
@@ -40,3 +40,9 @@ export const importSms = (token: string, messages: string[], fetchFn: Fetch = fe
 
 export const listTransactions = (token: string, month?: string, fetchFn: Fetch = fetch) =>
   authed<Transaction[]>(token, `/api/transactions${month ? `?month=${month}` : ''}`, {}, fetchFn)
+
+export const listCategories = (token: string, fetchFn: Fetch = fetch) =>
+  authed<string[]>(token, '/api/categories', {}, fetchFn)
+
+export const setCategory = (token: string, id: string, category: string, fetchFn: Fetch = fetch) =>
+  authed<void>(token, `/api/transactions/${id}/category`, { method: 'PUT', body: JSON.stringify({ category }) }, fetchFn)

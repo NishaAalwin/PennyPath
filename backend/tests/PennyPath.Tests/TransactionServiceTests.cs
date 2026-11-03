@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Time.Testing;
+using PennyPath.Application.Categorization;
 using PennyPath.Application.Parsing;
 using PennyPath.Domain.Entities;
 using PennyPath.Infrastructure.Persistence;
@@ -17,7 +18,7 @@ public class TransactionServiceTests
     private static readonly Guid Ravi = Guid.NewGuid();
 
     private static TransactionService Create(AppDbContext db) =>
-        new(db, new SmsTransactionParser(), new FakeTimeProvider(new DateTimeOffset(2026, 11, 2, 0, 0, 0, TimeSpan.Zero)));
+        new(db, new SmsTransactionParser(), new RuleCategorizer(), new FakeTimeProvider(new DateTimeOffset(2026, 11, 2, 0, 0, 0, TimeSpan.Zero)));
 
     private static AppDbContext NewDb() =>
         new(new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);

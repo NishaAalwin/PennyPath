@@ -71,3 +71,19 @@ Last updated: 2026-11-02
 | Browser behaviour under the CSP | Not verified | Only same-origin scripts/styles are in the page, so it should work, but it was not opened in a real browser |
 
 Breaking change for local setup: copy `.env.example` to `.env` and fill in `POSTGRES_PASSWORD` and `JWT_KEY` before `docker compose up`.
+
+## M5: rule-based categorization (2026-11-03)
+
+| Check | Status | Notes |
+|---|---|---|
+| Backend tests | 70 pass | Adds categorizer rules (incl. word-boundary cases), correction persists across re-import, cross-user update returns not-found, unknown category rejected, endpoints require auth |
+| Frontend tests, lint, build, `npm audit` | Verified (Node 24) | 12 tests pass; no vulnerabilities |
+| Dependency audit (NuGet) | Clean | No new packages |
+| Compose end-to-end (curl) | Verified | Migration `AddCategoryIsManual` applied on Postgres; import categorizes Swiggy as Food & Dining; `PUT` 204 and the change persists; unknown category 400; no token 401; other user 404 |
+| Category dropdown in a real browser | Not verified | Same browser limitation as before |
+| AI fallback | **Not built** | Waits for the consent design (M12). Default assumption: opt-in, merchant text only |
+| Categorization accuracy (>= 85%) | **Not measured** | Keyword lists are unvalidated guesses; needs labelled real transactions |
+
+### Known limitations
+- Rows imported before this change stay "Uncategorized" (no backfill), and rule changes do not re-categorize old rows.
+- The "Transfers" category exists but nothing assigns it yet (M9).

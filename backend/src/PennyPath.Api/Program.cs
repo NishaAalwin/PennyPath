@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using PennyPath.Application.Auth;
+using PennyPath.Application.Categorization;
 using PennyPath.Application.Parsing;
 using PennyPath.Application.Transactions;
 using PennyPath.Infrastructure.Auth;
@@ -36,6 +37,7 @@ builder.Services.AddScoped<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ITransactionParser, SmsTransactionParser>();
+builder.Services.AddSingleton<ICategorizer, RuleCategorizer>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

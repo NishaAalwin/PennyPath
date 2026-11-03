@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using PennyPath.Application.Categorization;
 using PennyPath.Application.Parsing;
 using PennyPath.Application.Transactions;
 using PennyPath.Domain.Entities;
@@ -10,7 +11,7 @@ using PennyPath.Infrastructure.Persistence;
 
 namespace PennyPath.Infrastructure.Transactions;
 
-public partial class TransactionService(AppDbContext db, ITransactionParser parser, TimeProvider clock) : ITransactionService
+public partial class TransactionService(AppDbContext db, ITransactionParser parser, ICategorizer categorizer, TimeProvider clock) : ITransactionService
 {
     public const int MaxMessages = 500;
     public const int MaxMessageLength = 2000;
@@ -42,6 +43,7 @@ public partial class TransactionService(AppDbContext db, ITransactionParser pars
                 Amount = parsed.Amount,
                 Type = parsed.Type,
                 Merchant = parsed.Merchant ?? string.Empty,
+                Category = categorizer.Categorize(parsed.Merchant, parsed.Type),
                 Account = parsed.Account,
                 Source = TransactionSource.Sms,
                 RawHash = hash,
@@ -59,6 +61,19 @@ public partial class TransactionService(AppDbContext db, ITransactionParser pars
 
         var duplicates = messages.Count(m => !string.IsNullOrWhiteSpace(m)) - unparsed.Count - fresh.Count;
         return new ImportResult(fresh.Count, duplicates, unparsed);
+    }
+
+    public async Task<CategoryUpdateResult> UpdateCategoryAsync(Guid userId, Guid transactionId, string? category, CancellationToken ct = default)
+    {
+        if (!Categories.IsValid(category)) return CategoryUpdateResult.InvalidCategory;
+
+        var tx = await db.Transactions.FirstOrDefaultAsync(t => t.Id == transactionId && t.UserId == userId, ct);
+        if (tx is null) return CategoryUpdateResult.NotFound;
+
+        tx.Category = category!;
+        tx.CategoryIsManual = true;
+        await db.SaveChangesAsync(ct);
+        return CategoryUpdateResult.Updated;
     }
 
     public async Task<IReadOnlyList<TransactionDto>> ListAsync(Guid userId, string? month, CancellationToken ct = default)

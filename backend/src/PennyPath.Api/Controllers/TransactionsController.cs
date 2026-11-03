@@ -22,6 +22,18 @@ public class TransactionsController(ITransactionService transactions) : Controll
         return Ok(await transactions.ImportSmsAsync(UserId, request.Messages, ct));
     }
 
+    [HttpGet("api/categories")]
+    public IActionResult Categories() => Ok(PennyPath.Application.Categorization.Categories.All);
+
+    [HttpPut("api/transactions/{id:guid}/category")]
+    public async Task<IActionResult> SetCategory(Guid id, UpdateCategoryRequest request, CancellationToken ct) =>
+        await transactions.UpdateCategoryAsync(UserId, id, request.Category, ct) switch
+        {
+            CategoryUpdateResult.Updated => NoContent(),
+            CategoryUpdateResult.InvalidCategory => BadRequest(new { error = "Unknown category." }),
+            _ => NotFound(),
+        };
+
     [HttpGet("api/transactions")]
     public async Task<IActionResult> List([FromQuery] string? month, CancellationToken ct)
     {

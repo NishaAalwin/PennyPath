@@ -13,6 +13,9 @@ public class Transaction
     public TransactionType Type { get; set; }
     public string Merchant { get; set; } = string.Empty;
     public string Category { get; set; } = "Uncategorized";
+
+    /// <summary>True once the user chose the category; automatic categorization never changes such a row.</summary>
+    public bool CategoryIsManual { get; set; }
     public string? Account { get; set; }
     public TransactionSource Source { get; set; }
 

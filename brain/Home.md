@@ -19,7 +19,7 @@ Every task is checked against this vault before it is called done. See [[Task Pr
 | M2 | not started (needs Google OAuth client from user) |
 | M3 | done, accuracy on real messages unmeasured |
 | M4 | done (paste import) |
-| M5 | not started |
+| M5 | rules + user correction done; AI fallback deferred; accuracy unmeasured |
 | M6 | not started |
 | M7 | partial (list only) |
 | M8 | done (Docker + CI green) |

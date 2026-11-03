@@ -22,6 +22,8 @@ public class AuthEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Theory]
     [InlineData("GET", "/api/transactions")]
     [InlineData("POST", "/api/sms/import")]
+    [InlineData("GET", "/api/categories")]
+    [InlineData("PUT", "/api/transactions/3fa85f64-5717-4562-b3fc-2c963f66afa6/category")]
     public async Task Transaction_endpoints_require_authentication(string method, string url)
     {
         var res = await factory.CreateClient().SendAsync(new HttpRequestMessage(new HttpMethod(method), url)
