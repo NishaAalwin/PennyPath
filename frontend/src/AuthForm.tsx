@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { login, register } from './api'
 
-type Props = { onAuthenticated: (token: string) => void }
+type Props = { onAuthenticated: (email: string) => void }
 
 export default function AuthForm({ onAuthenticated }: Props) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -16,7 +16,7 @@ export default function AuthForm({ onAuthenticated }: Props) {
     setBusy(true)
     try {
       const res = await (mode === 'login' ? login : register)(email, password)
-      onAuthenticated(res.token)
+      onAuthenticated(res.email)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     } finally {

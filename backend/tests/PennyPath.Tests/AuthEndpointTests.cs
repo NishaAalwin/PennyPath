@@ -2,14 +2,12 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using PennyPath.Application.Auth;
 using PennyPath.Infrastructure.Auth;
 
 namespace PennyPath.Tests;
 
-// These tests never touch the database: /me only validates the JWT.
+// These tests never reach the database: they only exercise requests that are rejected before any session lookup.
 public class AuthEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     [Fact]
@@ -37,20 +35,6 @@ public class AuthEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
             Content = method == "POST" ? JsonContent.Create(new { messages = new[] { "x" } }) : null,
         });
         Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
-    }
-
-    [Fact]
-    public async Task Me_with_valid_token_returns_email()
-    {
-        var token = factory.Services.GetRequiredService<IServiceScopeFactory>().CreateScope()
-            .ServiceProvider.GetRequiredService<ITokenService>().Create(Guid.NewGuid(), "a@b.com").Token;
-        var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var res = await client.GetAsync("/api/auth/me");
-
-        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
-        Assert.Contains("a@b.com", await res.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -83,8 +67,10 @@ public class AuthEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
     public async Task Oversized_request_body_is_rejected()
     {
         var big = new StringContent(new string('a', 1_100_000), System.Text.Encoding.UTF8, "application/json");
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Requested-With", "PennyPath");
 
-        var res = await factory.CreateClient().PostAsync("/api/auth/login", big);
+        var res = await client.PostAsync("/api/auth/login", big);
 
         Assert.True(res.StatusCode is HttpStatusCode.RequestEntityTooLarge or HttpStatusCode.BadRequest);
     }
@@ -93,7 +79,7 @@ public class AuthEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
     public async Task Me_with_token_signed_by_another_key_is_unauthorized()
     {
         var forged = new JwtTokenService(Options.Create(new JwtOptions { Key = new string('x', 40) }))
-            .Create(Guid.NewGuid(), "a@b.com").Token;
+            .Create(Guid.NewGuid(), "a@b.com", Guid.NewGuid()).Token;
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", forged);
 

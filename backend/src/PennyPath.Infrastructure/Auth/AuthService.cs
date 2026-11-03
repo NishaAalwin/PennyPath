@@ -51,7 +51,7 @@ public class AuthService(AppDbContext db, ITokenService tokens, TimeProvider clo
             // Lost a race with a concurrent registration; the unique index caught it.
             return new AuthResult(null, AuthError.EmailTaken, "An account with this email already exists.");
         }
-        return Success(user);
+        return await SuccessAsync(user, ct);
     }
 
     public async Task<AuthResult> LoginAsync(LoginRequest request, CancellationToken ct = default)
@@ -70,7 +70,7 @@ public class AuthService(AppDbContext db, ITokenService tokens, TimeProvider clo
 
         var now = clock.GetUtcNow().UtcDateTime;
         if (user.LockoutEnd > now)
-            return new AuthResult(null, AuthError.LockedOut, "Too many failed attempts. Try again later.");
+            return new AuthResult(null, AuthError.LockedOut, "Too many failed attempts. Try again later.", user.Id);
 
         var result = Hasher.VerifyHashedPassword(user, user.PasswordHash, password);
         if (result == PasswordVerificationResult.Failed)
@@ -82,7 +82,7 @@ public class AuthService(AppDbContext db, ITokenService tokens, TimeProvider clo
                 user.FailedLoginCount = 0;
             }
             await db.SaveChangesAsync(ct);
-            return invalid;
+            return invalid with { UserId = user.Id };
         }
 
         user.FailedLoginCount = 0;
@@ -90,7 +90,25 @@ public class AuthService(AppDbContext db, ITokenService tokens, TimeProvider clo
         if (result == PasswordVerificationResult.SuccessRehashNeeded)
             user.PasswordHash = Hasher.HashPassword(user, password);
         await db.SaveChangesAsync(ct);
-        return Success(user);
+        return await SuccessAsync(user, ct);
+    }
+
+    public async Task<bool> LogoutAsync(Guid userId, Guid sessionId, CancellationToken ct = default)
+    {
+        var session = await db.Sessions.FirstOrDefaultAsync(s => s.Id == sessionId && s.UserId == userId, ct);
+        if (session is null) return false;
+        session.RevokedAt ??= clock.GetUtcNow().UtcDateTime;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task<int> LogoutAllAsync(Guid userId, CancellationToken ct = default)
+    {
+        var now = clock.GetUtcNow().UtcDateTime;
+        var active = await db.Sessions.Where(s => s.UserId == userId && s.RevokedAt == null && s.ExpiresAt > now).ToListAsync(ct);
+        foreach (var s in active) s.RevokedAt = now;
+        await db.SaveChangesAsync(ct);
+        return active.Count;
     }
 
     private static string? CheckPassword(string? password, string email)
@@ -107,10 +125,18 @@ public class AuthService(AppDbContext db, ITokenService tokens, TimeProvider clo
         return null;
     }
 
-    private AuthResult Success(User user)
+    private async Task<AuthResult> SuccessAsync(User user, CancellationToken ct)
     {
-        var (token, expires) = tokens.Create(user.Id, user.Email);
-        return new AuthResult(new AuthResponse(token, expires, user.Email), AuthError.None);
+        var now = clock.GetUtcNow().UtcDateTime;
+        var sessionId = Guid.NewGuid();
+        var (token, expires) = tokens.Create(user.Id, user.Email, sessionId);
+
+        // Drop this user's long-dead sessions so the table does not grow without bound.
+        db.Sessions.RemoveRange(await db.Sessions.Where(s => s.UserId == user.Id && s.ExpiresAt < now.AddDays(-1)).Take(100).ToListAsync(ct));
+        db.Sessions.Add(new Session { Id = sessionId, UserId = user.Id, CreatedAt = now, ExpiresAt = expires });
+        await db.SaveChangesAsync(ct);
+
+        return new AuthResult(new AuthResponse(token, expires, user.Email), AuthError.None, UserId: user.Id);
     }
 
     private static string Normalize(string? email) => (email ?? string.Empty).Trim().ToLowerInvariant();

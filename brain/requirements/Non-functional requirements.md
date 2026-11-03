@@ -4,7 +4,8 @@ From `docs/requirements.md` §6.
 
 | NFR | Target | Current |
 |---|---|---|
-| Security | encrypted tokens at rest, HTTPS, no raw email bodies stored, "delete my data" | partial — see [[Security checklist]] |
+| Security | encrypted tokens at rest, HTTPS, no raw email bodies stored, "delete my data" | HTTPS proxy, encryption service + persisted key ring, cookie sessions with revocation done ([[M12 Security gate]]); "delete my data" not yet ([[M10 Account lifecycle]]) |
+| Observability | audit log of security events | done (no alerting) |
 | Data minimisation | only amount, where/what, date, debit/credit stored in PostgreSQL; no account/reference numbers, balances or message text | done, see [[Data minimisation]] |
 | Privacy | only transaction-like emails read (sender + keyword filter) | n/a until [[M2 Gmail import]] |
 | Performance | dashboard < 2 s for 10k transactions | API ~0.22–0.32 s per endpoint with 10,000 rows (compose Postgres, 2026-11-03); browser render time not measured |

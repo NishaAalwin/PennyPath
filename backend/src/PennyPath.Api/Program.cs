@@ -1,16 +1,22 @@
 using System.Net;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using PennyPath.Api.Security;
 using PennyPath.Application.Auth;
 using PennyPath.Application.Categorization;
 using PennyPath.Application.Parsing;
+using PennyPath.Application.Security;
 using PennyPath.Application.Transactions;
 using PennyPath.Infrastructure.Auth;
 using PennyPath.Infrastructure.Persistence;
+using PennyPath.Infrastructure.Security;
 using PennyPath.Infrastructure.Transactions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -36,20 +42,63 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptio
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IAuditLog, AuditLog>();
+builder.Services.AddScoped<IAiConsent, AiConsentService>();
+builder.Services.AddSingleton(new SessionCookieSettings(builder.Configuration.GetValue("Auth:CookieSecure", true)));
+
+// Key ring for encrypting stored secrets (e.g. Gmail tokens). It must survive restarts and redeploys, or every
+// stored secret becomes unreadable; outside Development it has to be configured on persistent storage.
+var dataProtection = builder.Services.AddDataProtection().SetApplicationName("PennyPath");
+var keysPath = builder.Configuration["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(keysPath)) dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keysPath));
+else if (!builder.Environment.IsDevelopment())
+    throw new InvalidOperationException("DataProtection:KeysPath must point at persistent storage outside Development.");
+builder.Services.AddSingleton<ITokenProtector, DataProtectionTokenProtector>();
 builder.Services.AddSingleton<ITransactionParser, SmsTransactionParser>();
 builder.Services.AddSingleton<ICategorizer, RuleCategorizer>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(o => o.TokenValidationParameters = new TokenValidationParameters
+    .AddJwtBearer(o =>
     {
-        ValidIssuer = jwt.Issuer,
-        ValidAudience = jwt.Audience,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)),
-        ValidAlgorithms = [SecurityAlgorithms.HmacSha256], // refuse "none" and algorithm-confusion tokens
-        RequireExpirationTime = true,
-        ValidateLifetime = true,
-        ClockSkew = TimeSpan.FromSeconds(30),
+        o.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidIssuer = jwt.Issuer,
+            ValidAudience = jwt.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)),
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256], // refuse "none" and algorithm-confusion tokens
+            RequireExpirationTime = true,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+        };
+        o.Events = new JwtBearerEvents
+        {
+            // The browser sends the token in the HttpOnly cookie; an explicit Authorization header still works for other clients.
+            OnMessageReceived = ctx =>
+            {
+                if (!ctx.Request.Headers.ContainsKey("Authorization")
+                    && ctx.Request.Cookies.TryGetValue(ctx.HttpContext.RequestServices.GetRequiredService<SessionCookieSettings>().Name, out var t))
+                {
+                    ctx.Token = t;
+                    ctx.HttpContext.Items[CsrfProtectionMiddleware.CookieAuthItem] = true;
+                }
+                return Task.CompletedTask;
+            },
+            // A valid signature is not enough: the session behind the token must still be active (logout revokes it).
+            OnTokenValidated = async ctx =>
+            {
+                var ok = Guid.TryParse(ctx.Principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)
+                    & Guid.TryParse(ctx.Principal?.FindFirstValue(JwtRegisteredClaimNames.Jti), out var sessionId);
+                if (ok)
+                {
+                    var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                    var now = ctx.HttpContext.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime;
+                    ok = await db.Sessions.AnyAsync(x => x.Id == sessionId && x.UserId == userId && x.RevokedAt == null && x.ExpiresAt > now,
+                        ctx.HttpContext.RequestAborted);
+                }
+                if (!ok) ctx.Fail("The session has ended.");
+            },
+        };
     });
 builder.Services.AddAuthorization();
 
@@ -82,7 +131,7 @@ if (proxies.Length > 0)
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     .WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [])
     .WithHeaders("Authorization", "Content-Type")
-    .WithMethods("GET", "POST", "PATCH", "DELETE")));
+    .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")));
 
 var app = builder.Build();
 
@@ -118,6 +167,7 @@ else
 app.UseCors();
 app.UseRateLimiter();
 app.UseAuthentication();
+app.UseMiddleware<CsrfProtectionMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 

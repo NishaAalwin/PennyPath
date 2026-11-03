@@ -11,7 +11,7 @@ public class JwtTokenService(IOptions<JwtOptions> options) : ITokenService
 {
     private readonly JwtOptions _o = options.Value;
 
-    public (string Token, DateTime ExpiresAt) Create(Guid userId, string email)
+    public (string Token, DateTime ExpiresAt) Create(Guid userId, string email, Guid sessionId)
     {
         var expires = DateTime.UtcNow.AddMinutes(_o.ExpiryMinutes);
         var descriptor = new SecurityTokenDescriptor
@@ -23,6 +23,7 @@ public class JwtTokenService(IOptions<JwtOptions> options) : ITokenService
             [
                 new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, email),
+                new Claim(JwtRegisteredClaimNames.Jti, sessionId.ToString()), // the session; revoking it kills this token
             ]),
             SigningCredentials = new SigningCredentials(
                 new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_o.Key)), SecurityAlgorithms.HmacSha256),

@@ -1,47 +1,55 @@
 import { useEffect, useState } from 'react'
-import { getHealth, getMe, type Health } from './api'
+import { getHealth, getMe, logout as logoutRequest, type Health } from './api'
 import AuthForm from './AuthForm'
+import PrivacyPanel from './PrivacyPanel'
 import TransactionsPanel from './TransactionsPanel'
-import { clearToken, loadToken, saveToken } from './session'
 
 export default function App() {
   const [health, setHealth] = useState<Health | null>(null)
   const [healthError, setHealthError] = useState<string | null>(null)
-  const [token, setToken] = useState<string | null>(loadToken)
-  const [email, setEmail] = useState<string | null>(null)
+  // undefined while we ask the server whether the session cookie is still valid; null when signed out.
+  const [email, setEmail] = useState<string | null | undefined>(undefined)
 
   useEffect(() => {
     getHealth().then(setHealth).catch((e: Error) => setHealthError(e.message))
   }, [])
 
   useEffect(() => {
-    if (!token) return
-    getMe(token).then((me) => setEmail(me.email)).catch(() => logout())
-  }, [token])
+    try {
+      localStorage.removeItem('pennypath.token') // older versions kept the login token here; it is no longer used
+    } catch {
+      /* storage unavailable */
+    }
+    getMe().then((me) => setEmail(me.email)).catch(() => setEmail(null))
+  }, [])
 
-  function onAuthenticated(t: string) {
-    saveToken(t)
-    setToken(t)
+  function signedOut() {
+    setEmail(null)
   }
 
-  function logout() {
-    clearToken()
-    setToken(null)
-    setEmail(null)
+  async function logout() {
+    try {
+      await logoutRequest()
+    } finally {
+      signedOut()
+    }
   }
 
   return (
     <main style={{ fontFamily: 'system-ui', maxWidth: 480, margin: '4rem auto', padding: '0 1rem' }}>
       <h1>PennyPath</h1>
       <p>Your path to financial growth.</p>
-      {token ? (
+      {email === undefined ? (
+        <p>Checking your session...</p>
+      ) : email ? (
         <section>
-          <p>Signed in as <strong>{email ?? '...'}</strong></p>
+          <p>Signed in as <strong>{email}</strong></p>
           <button onClick={logout}>Log out</button>
-          <TransactionsPanel token={token} onSessionExpired={logout} />
+          <TransactionsPanel onSessionExpired={signedOut} />
+          <PrivacyPanel onSessionExpired={signedOut} />
         </section>
       ) : (
-        <AuthForm onAuthenticated={onAuthenticated} />
+        <AuthForm onAuthenticated={setEmail} />
       )}
       <p style={{ marginTop: '2rem', color: '#666' }}>
         API: {healthError ? `unreachable (${healthError})` : health ? `${health.status} (database: ${health.database})` : 'checking...'}

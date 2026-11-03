@@ -161,3 +161,22 @@ User decision: read and keep only amount, where/what (merchant), date and debit/
 - Editing clears old duplicate/refund guesses but does not look for new ones.
 - Sorting is newest first only; there is no amount-range filter; searching a number matches the exact amount.
 - `GET /api/transactions` now returns `{items,total,page,pageSize}` instead of a bare array (a breaking change for any other client; the web app was updated).
+
+## M12 security gate (2026-11-03)
+
+| Check | Status | Notes |
+|---|---|---|
+| Backend tests | 193 pass | Adds sessions (cookie flags, token not in body, logout kills a copied cookie, logout-all, other users untouched, unknown/expired session rejected), CSRF (header, fetch metadata, anonymous sign-in), audit log (recorded, owner-only, no secrets, retention, IP cap), AI consent, token protector (round trip, tamper, purpose, restart, lost key) |
+| Frontend tests, lint, build, `npm audit` | Verified (Node 24) | 32 tests; no vulnerabilities |
+| NuGet vulnerability scan | Clean | A critical advisory in the Data Protection version I first added (10.0.4) and a high one in a transitive package were found and fixed by moving to 10.0.14 |
+| HTTPS stack | **Verified** | `docker compose up`: proxy, web, api, db healthy; only the proxy publishes a port (loopback 8443); 5000 and 8080 closed; plain HTTP to the TLS port refused |
+| Cookie, CSRF, revocation, forwarded headers (curl against the real stack) | **Verified** | See security.md. Spoofed X-Forwarded-For ignored; audit IP is the gateway address 172.28.0.1 |
+| Real browser (Edge via DevTools, `scripts/browser-e2e.mjs`) | **Verified** | 43 of 43, three runs in a row: the whole UI flow, hardened cookie, empty storage, CSP blocks injected inline script / blob script / cross-origin request, no violation from the app, every console error accounted for. Also closes the "not browser-tested" items for M1, M5, M6, M7, M9. Found and fixed one real flaw (page label ahead of rows) |
+| Backup and restore | **Verified** | Encrypted dump + key ring; restore into a scratch DB equals live (counts, sum, content hash); wrong passphrase, live DB name, odd name, short passphrase refused; no plaintext in the encrypted files |
+| Key ring persistence | **Verified** | The `dpkeys` volume holds a key the app created; directory writable by the non-root user |
+
+### Known limitations
+- Not tested: real-domain TLS (Let's Encrypt), load/rate-limit behaviour, behaviour after `docker compose down -v` (would lose the key ring and database), a real Gmail token round trip (no Gmail code yet).
+- Browser checks ran in headless Edge only (no Firefox or Safari; SameSite=Strict and `__Host-` cookies behave the same in current Chrome-family browsers, unchecked elsewhere).
+- Chart cards theme themselves for dark mode; the rest of the page stays light.
+- The app moved to https://localhost:8443; the old ports no longer answer.

@@ -2,7 +2,7 @@
 id: M7
 release: MVP
 status: done-with-gaps
-verified: 159 backend + 29 frontend tests; live on compose Postgres with 10,000 rows (2026-11-03); UI not tested in a browser
+verified: 159 backend + 29 frontend tests; live on compose Postgres with 10,000 rows (2026-11-03); UI verified in a real browser (Edge) 2026-11-03
 ---
 # M7 Transaction list with search, filter and edit
 
@@ -19,7 +19,7 @@ verified: 159 backend + 29 frontend tests; live on compose Postgres with 10,000 
 - [x] UI: search box, category, in/out and "All months" filters, previous/next with "x-y of n", inline edit form with server error shown — `frontend/src/TransactionList.tsx`; query building unit tested
 - [x] List follows the month picked in the summary (so list and totals agree), unless "All months" is ticked
 - [x] **Performance (10k rows, compose Postgres, 5 runs):** default page, a search+type+page query and a month+category query each ~0.21–0.24 s; a 25-row page is ~12 KB instead of every row
-- [ ] UI **not tested in a browser** (search debounce, paging buttons, edit form)
+- [x] UI tested in a real browser: search (debounced), money-in filter, invalid edit shows the server message, valid edit updates row and totals, paging over 35 rows (Next, Previous, page reset on search). The browser found a real flaw (the "26-35 of 35" label ran ahead of the rows while loading); fixed by labelling the loaded page
 - [ ] Editing does not re-run duplicate/refund detection for the edited row (it only clears old guesses)
 - [ ] Sorting is fixed to newest first; no amount-range filter; amount search is exact only
 - [ ] Manual **add** of a transaction is M11, not here

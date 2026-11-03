@@ -27,7 +27,7 @@ Every task is checked against this vault before it is called done. See [[Task Pr
 | M10 | not started (new) |
 | M11 | not started (new) |
 | DM1 | done: only amount, where/what, date, debit/credit stored (PostgreSQL) |
-| M12 | not started (new); must finish before M2 ships |
+| M12 | done with gaps: HTTPS proxy, cookie sessions + CSRF, revocation, audit log, AI consent, key ring + encryption service, tested backups, real-browser check; user actions and disk encryption remain; M2 may now proceed |
 
 Keep this table and each note's `status:` in sync when a task lands.
 

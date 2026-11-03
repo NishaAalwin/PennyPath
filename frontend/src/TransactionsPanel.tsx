@@ -5,9 +5,9 @@ import {
   getSummary, getTrend, importSms, listCategories, splitMessages, type ImportResult, type MonthlySummary, type TrendMonth,
 } from './transactions'
 
-type Props = { token: string; onSessionExpired: () => void }
+type Props = { onSessionExpired: () => void }
 
-export default function Transactions({ token, onSessionExpired }: Props) {
+export default function Transactions({ onSessionExpired }: Props) {
   const [text, setText] = useState('')
   const [version, setVersion] = useState(0)
   const [result, setResult] = useState<ImportResult | null>(null)
@@ -27,14 +27,14 @@ export default function Transactions({ token, onSessionExpired }: Props) {
   )
 
   const refresh = useCallback(
-    () => Promise.all([getSummary(token, month).then(setSummary), getTrend(token, month).then(setTrend)]).catch(handleError),
-    [token, month, handleError],
+    () => Promise.all([getSummary(month).then(setSummary), getTrend(month).then(setTrend)]).catch(handleError),
+    [month, handleError],
   )
 
   useEffect(() => {
     refresh()
-    listCategories(token).then(setCategories).catch(handleError)
-  }, [refresh, token, handleError])
+    listCategories().then(setCategories).catch(handleError)
+  }, [refresh, handleError])
 
   async function submit() {
     const messages = splitMessages(text)
@@ -42,7 +42,7 @@ export default function Transactions({ token, onSessionExpired }: Props) {
     setError(null)
     setBusy(true)
     try {
-      setResult(await importSms(token, messages))
+      setResult(await importSms(messages))
       setText('')
       setVersion((v) => v + 1)
       await refresh()
@@ -77,7 +77,7 @@ export default function Transactions({ token, onSessionExpired }: Props) {
         </details>
       )}
 
-      <TransactionList token={token} month={month} categories={categories} version={version} onChanged={refresh} onError={handleError} />
+      <TransactionList month={month} categories={categories} version={version} onChanged={refresh} onError={handleError} />
     </section>
   )
 }

@@ -13,7 +13,7 @@ blocked-on: Google OAuth client (client id/secret) from the user
 ## Code check (must hold when built)
 - [ ] Only the read-only Gmail scope is requested
 - [ ] Only transaction-like emails are fetched (filter by sender + keywords) — privacy NFR
-- [ ] Refresh tokens **encrypted at rest** (ASP.NET Data Protection with persisted key ring) before this ships
+- [ ] Refresh tokens **encrypted at rest** with `ITokenProtector` (built in [[M12 Security gate]]; key ring persisted on a volume and included in `scripts/backup.sh`) before this ships; losing the key ring makes them unreadable
 - [ ] Raw email bodies are **not stored**, only parsed fields
 - [ ] Reuses the parser from [[M3 Transaction parser]]
 - [ ] Idempotent sync: re-running creates no duplicates (dedupe key)

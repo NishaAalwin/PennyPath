@@ -15,7 +15,7 @@ status: not-started
 - [ ] Reset/verify tokens stored hashed, never logged
 - [ ] Delete account removes users, transactions, Gmail tokens, and any AI consent records; test proves rows are gone
 - [ ] Deletion requires re-authentication
-- [ ] Existing JWTs stop working after deletion/password change (needs revocation, see [[Security checklist]] item 4)
+- [ ] Existing sessions stop working after deletion/password change: use `IAuthService.LogoutAllAsync` (sessions exist since [[M12 Security gate]]); deletion already cascades to `Sessions` and `AuditEvents`; also delete audit rows by account
 - [ ] Optional data export (GDPR/DPDP-style)
 
 Extends [[M1 Sign up and login]].

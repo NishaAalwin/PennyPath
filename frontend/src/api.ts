@@ -1,7 +1,15 @@
-export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000'
+/** Empty means "same origin": the page and the API are served from one HTTPS address by the proxy. */
+export const API_URL = import.meta.env.VITE_API_URL ?? ''
+
+/**
+ * Sent on every request. A page on another site cannot add a custom header without a CORS preflight, which the API
+ * refuses, so this (with SameSite=Strict on the cookie) stops cross-site request forgery.
+ */
+export const APP_HEADERS = { 'X-Requested-With': 'PennyPath' }
 
 export type Health = { status: string; database: boolean }
-export type AuthResponse = { token: string; expiresAt: string; email: string }
+export type AuthResponse = { expiresAt: string; email: string }
+export type SecurityEvent = { id: string; type: string; at: string; ip: string | null }
 
 export class ApiError extends Error {
   status: number
@@ -22,7 +30,8 @@ export async function getHealth(fetchFn: Fetch = fetch): Promise<Health> {
 async function postAuth(path: string, email: string, password: string, fetchFn: Fetch): Promise<AuthResponse> {
   const res = await fetchFn(`${API_URL}/api/auth/${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', ...APP_HEADERS },
     body: JSON.stringify({ email, password }),
   })
   if (!res.ok) {
@@ -39,8 +48,30 @@ export const register = (email: string, password: string, fetchFn: Fetch = fetch
 export const login = (email: string, password: string, fetchFn: Fetch = fetch) =>
   postAuth('login', email, password, fetchFn)
 
-export async function getMe(token: string, fetchFn: Fetch = fetch): Promise<{ id: string; email: string }> {
-  const res = await fetchFn(`${API_URL}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
-  if (!res.ok) throw new ApiError('Session expired', res.status)
-  return res.json()
+async function call<T>(path: string, init: RequestInit, fetchFn: Fetch): Promise<T> {
+  const res = await fetchFn(`${API_URL}${path}`, {
+    ...init,
+    credentials: 'same-origin',
+    headers: { ...init.headers, ...APP_HEADERS, 'Content-Type': 'application/json' },
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new ApiError(body?.error ?? 'Something went wrong.', res.status)
+  }
+  return (res.status === 204 ? undefined : await res.json()) as T
 }
+
+/** Who is signed in? Rejects with status 401 when there is no valid session cookie. */
+export const getMe = (fetchFn: Fetch = fetch) => call<{ id: string; email: string }>('/api/auth/me', {}, fetchFn)
+
+/** Ends this browser's session on the server (so a copied cookie stops working) and clears the cookie. */
+export const logout = (fetchFn: Fetch = fetch) => call<void>('/api/auth/logout', { method: 'POST' }, fetchFn)
+
+export const logoutAll = (fetchFn: Fetch = fetch) => call<void>('/api/auth/logout-all', { method: 'POST' }, fetchFn)
+
+export const getAiConsent = (fetchFn: Fetch = fetch) => call<{ enabled: boolean }>('/api/privacy/ai', {}, fetchFn)
+
+export const setAiConsent = (enabled: boolean, fetchFn: Fetch = fetch) =>
+  call<void>('/api/privacy/ai', { method: 'PUT', body: JSON.stringify({ enabled }) }, fetchFn)
+
+export const getSecurityEvents = (fetchFn: Fetch = fetch) => call<SecurityEvent[]>('/api/security/events', {}, fetchFn)

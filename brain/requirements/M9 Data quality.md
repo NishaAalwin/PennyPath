@@ -2,7 +2,7 @@
 id: M9
 release: MVP
 status: done-with-gaps
-verified: 119 backend + 14 frontend tests; live on compose Postgres (2026-11-03); browser UI untested
+verified: 119 backend + 14 frontend tests; live on compose Postgres (2026-11-03); flag/refund/transfer actions verified in a real browser (2026-11-03)
 ---
 # M9 Data quality
 
@@ -37,7 +37,7 @@ Exclude `DuplicateOfId != null` and `IsTransfer`; a refund reduces expense and i
 - [ ] Accounts modelled per user — **dropped** (no account data kept)
 - [ ] Rule accuracy on real messages (false-positive duplicates) — unmeasured
 - [ ] Partial refunds and a refund imported *before* its purchase are not linked (they still reduce expense in the summary)
-- [ ] Browser check of the UI
+- [x] Browser check of the UI: the duplicate row shows its two actions; "Not a duplicate" moves spending 650 → 900; "Mark as transfer" takes it out again (900 → 650) and shows "Not a transfer"; the refund row is labelled
 
 ## Known gaps and risks
 - Two real purchases at the same merchant, same amount, same day are flagged as possible duplicates (the user confirms). Without reference numbers this cannot be told apart.

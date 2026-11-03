@@ -2,7 +2,7 @@
 id: M5
 release: MVP
 status: partial-rules-done
-verified: 70 backend + 12 frontend tests; live on compose Postgres (2026-11-03); browser UI untested
+verified: 70 backend + 12 frontend tests; live on compose Postgres (2026-11-03); category dropdown verified in a real browser (2026-11-03)
 ---
 # M5 Auto-categorize transactions
 
@@ -23,7 +23,7 @@ verified: 70 backend + 12 frontend tests; live on compose Postgres (2026-11-03);
 - [ ] **AI (Claude API) fallback** — deliberately not built; waits for opt-in/consent design in [[M12 Security gate]] (default assumption: opt-in, merchant text only)
 - [ ] **≥ 85% accuracy** on 100 labelled transactions ([[Non-functional requirements]]) — unmeasured; keyword lists are my guesses for Indian merchants
 - [ ] Re-categorize existing rows when rules change (only new imports are categorized)
-- [ ] Browser check of the dropdown
+- [x] Browser check of the dropdown: changing a row's category moved its spending to that category in the summary (Edge, `scripts/browser-e2e.mjs`)
 
 ## Known gaps
 - Existing rows from before this change keep "Uncategorized" (no backfill).

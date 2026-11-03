@@ -13,21 +13,25 @@ Standing requirement from the user: *the application must be secured from extern
 - [ ] CORS/CSP/headers not loosened; Swagger stays Development-only
 - [ ] Sensitive data minimised (esp. anything sent to the Claude API)
 - [ ] `docs/security.md` updated, including what is **not** done
+- [ ] State-changing endpoints work with the cookie + `X-Requested-With` header and are covered by the CSRF tests; no endpoint puts a token in a response body
+- [ ] New secrets stored at rest go through `ITokenProtector`, never plain columns
+- [ ] AI features call `IAiConsent.IsEnabledAsync` first and send merchant text or aggregates only
+- [ ] Security-relevant events are written to the audit log (no personal or financial data in it)
 
 ## Data stored (see [[Data minimisation]])
 Only amount, merchant, date, debit/credit, category/flags and a SHA-256 of the message. No account numbers, references, balances or message text. Unreadable messages are never stored (an earlier exception was removed 2026-11-03).
 - [ ] Any new feature must keep to this set, or record a decision with the user first
 - [ ] Consider an HMAC (server secret) instead of a plain SHA-256 for the message hash
 
-## Open items (keep current)
-1. Revoke the GitHub tokens pasted in chat earlier (user action)
-2. GitHub settings: branch protection, secret scanning, Dependabot alerts, private vuln reporting (user action)
-3. HTTPS not set up; do not expose beyond localhost
-4. JWT in `localStorage`; move to httpOnly SameSite cookie + CSRF; no revocation/refresh
-5. No email verification, password reset, MFA
-6. DB not encrypted at rest, no backups
-7. Gmail tokens must be encrypted at rest before [[M2 Gmail import]] ships
-8. No audit log / monitoring
-9. Docker images not scanned
-10. Not penetration tested; CSP not checked in a real browser
-11. Account deletion and data export not implemented; AI needs consent and minimisation
+## Open items (keep current; updated 2026-11-03 after [[M12 Security gate]])
+1. **User action:** revoke the GitHub tokens pasted in chat earlier
+2. **User action:** GitHub settings: branch protection, secret scanning, Dependabot alerts, private vulnerability reporting
+3. HTTPS: local uses Caddy's own CA; a public deployment needs a real domain (`SITE_ADDRESS`) and open ports 80/443
+4. No refresh tokens (fixed 60-minute sessions; no rotation or reuse detection)
+5. No email verification, password reset or MFA ([[M10 Account lifecycle]])
+6. No DB encryption at rest (use host disk/volume encryption); Data Protection key files unencrypted at rest; backups not scheduled or copied off-machine
+7. Gmail tokens must be stored with `ITokenProtector` when [[M2 Gmail import]] is built
+8. Audit log exists; no alerting or monitoring
+9. Docker images not scanned; not penetration tested (browser check was functional, not a pen test)
+10. Account deletion and data export not implemented ([[M10 Account lifecycle]]); AI features not built (gate exists)
+11. Rate limit is per IP and not load-tested; on Docker Desktop all local requests share one address

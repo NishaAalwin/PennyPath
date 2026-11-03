@@ -1,7 +1,7 @@
 # PennyPath: Security
 
 PennyPath stores personal financial data, so security is a requirement, not a later add-on.
-Last reviewed: 2026-11-02. Nothing here replaces a professional security audit before a public launch.
+Last reviewed: 2026-11-03 (security gate M12; see the last section). Nothing here replaces a professional security audit before a public launch.
 
 ## Protected assets
 Account credentials, financial transactions (amounts, merchants, accounts), and later Gmail OAuth tokens.
@@ -43,18 +43,32 @@ Account credentials, financial transactions (amounts, merchants, accounts), and 
 ## Not done / needs your action
 1. **Revoke the GitHub tokens that were pasted into chat** (both of them). Treat them as compromised.
 2. **Enable in GitHub settings** (not possible from code): branch protection on `main` (require CI + CodeQL, require PRs), secret scanning with push protection, Dependabot alerts, and private vulnerability reporting.
-3. **HTTPS is not set up.** TLS must be terminated by a reverse proxy or the host platform (the app is HTTP inside the compose network). Until then, tokens and passwords travel in clear text, so do not expose this beyond localhost. When a proxy is added, set `ForwardedHeaders:KnownProxies` so rate limits see real client IPs.
-4. **JWT is stored in `localStorage`.** The CSP reduces the risk, but an XSS bug would still expose the token. Moving to an httpOnly, SameSite cookie (with CSRF protection) is a recommended follow-up. Tokens last 60 minutes and cannot be revoked early (no refresh or revocation yet).
-5. **No email verification, password reset or MFA yet.**
-6. **Database is not encrypted at rest** and has no backups; use disk/volume encryption and managed backups in production. Transaction text fields are stored in clear text.
-7. **Gmail (M2):** OAuth refresh tokens must be encrypted at rest (ASP.NET Data Protection with a persisted key ring) before that milestone ships, and only read-only scopes requested.
-8. **No audit log or security monitoring/alerting.**
-9. **Docker base images are not scanned** (add Trivy or similar), and the API container's `Server` banner is removed but nginx still shows `Server: nginx` (version hidden).
-10. **Not penetration tested.** The CSP and form behaviour were not checked in a real browser.
-11. **Privacy/compliance:** account deletion and data export are not implemented (needed for GDPR/DPDP-style obligations); the AI features will need consent and data minimisation (send aggregates, not raw messages).
+3. **HTTPS for a real deployment.** Locally the proxy serves HTTPS with a development certificate from Caddy's own CA (browsers warn until it is trusted). A public deployment needs a real domain (`SITE_ADDRESS`) with ports 80/443 open so Caddy can get a Let's Encrypt certificate; hosting is still undecided. See [operations.md](operations.md).
+4. **No refresh tokens.** Sessions last 60 minutes and are not extended. They can be ended early (log out, sign out of all devices), but there is no sliding expiry, rotation or reuse detection.
+5. **No email verification, password reset or MFA yet** (M10).
+6. **Database is not encrypted at rest** (PostgreSQL does not do it here); use disk/volume encryption on the host. The **Data Protection key files are not encrypted at rest** either (no certificate configured). Backups are encrypted and restore-tested, but **not scheduled and not copied off the machine**.
+7. **Gmail (M2):** the encryption service and persisted key ring exist, but no Gmail code uses them yet. Only read-only scopes may be requested.
+8. **Audit log exists but nothing watches it:** no alerting, no log shipping, no tamper protection.
+9. **Docker base images are not scanned** (add Trivy or similar).
+10. **Not penetration tested.** The app was exercised in a real browser (Edge, 43 checks, see below), but that is a functional check, not a penetration test.
+11. **Privacy/compliance:** account deletion and data export are not implemented (M10; needed for GDPR/DPDP-style obligations). AI consent exists (off by default) but no AI feature exists yet, and the gate only works if every future AI feature calls it.
+12. **Rate limiting** is per client IP, now the real client address behind the proxy. It was not load-tested. On Docker Desktop the client appears as the Docker gateway address (172.28.0.1), so all local requests share one limit.
 
 ## Update 2026-11-03: data minimisation
 Only amount, merchant (where/what), date and debit/credit are stored. Account numbers, bank reference numbers, balances and message text are not read or stored. Messages the parser cannot read are shown once in the import response and are not saved (an earlier version kept them for review; that was removed and a migration deleted the stored text). Only a SHA-256 of the normalised message is kept so re-importing a message is a no-op. A hash of a short, structured SMS can in principle be guessed by someone who has the database; an HMAC with a server secret would prevent that (not done). New endpoints (`/api/summary`, `/api/transactions/{id}` delete, transfer and not-duplicate) require a JWT and are scoped to the token's user; cross-user access returns 404 (tested).
 
 ## Update 2026-11-03: list search and edit (M7)
 `GET /api/transactions` and `PUT /api/transactions/{id}` require a JWT and are scoped to the token's user (another user's id returns 404). Inputs are bounded on the server: search 100 characters, page size 100, merchant 200 characters without control characters, amount 0 to 999,999,999.99 with 2 decimals, dates 2000-01-01 to tomorrow. Search is parameterised through Entity Framework, so `%`, `_` and quotes are plain text (verified on PostgreSQL). No new data is stored.
+
+## Update 2026-11-03: security gate (M12)
+- **Cookie sessions replace the token in `localStorage`.** The login token is only in `__Host-pp_session` (HttpOnly, Secure, SameSite=Strict, Path=/, no Domain) and is never in a response body. A page script cannot read it (verified in Edge: `document.cookie` empty, `localStorage`/`sessionStorage` empty).
+- **CSRF:** state-changing requests need `X-Requested-With: PennyPath` and must not be `Sec-Fetch-Site: cross-site/same-site`, otherwise 403 (verified live). Sign-in and sign-up are covered too.
+- **Server-side sessions and revocation:** every token carries a session id; each request checks the session is active. Log out ends it, "sign out of all devices" ends all, expired or unknown sessions are rejected. A copied cookie stops working after logout (verified live: 204 then 401).
+- **One HTTPS origin:** a Caddy proxy is the only published port (`https://localhost:8443`, loopback). No CORS is needed or allowed. The API and web containers have no host ports (ports 5000 and 8080 are closed, verified). The API trusts `X-Forwarded-*` only from the proxy's fixed address; a spoofed header did not reach the audit log (verified). `Server` banners are removed.
+- **CSP** tightened to `connect-src 'self'` only. In Edge it blocked an injected inline script, a blob: script and a request to another origin, and the app itself caused no violations.
+- **Audit log** (sign-up, sign-in, failure, lockout, sign-out, consent changes): type, time, IP, account. No emails, passwords or financial data. Users see their own entries; 90-day retention.
+- **AI consent** (off by default) with a per-user flag, endpoint, audit trail and UI; `IAiConsent` is the gate future AI features must call.
+- **Encrypted secrets:** `ITokenProtector` (ASP.NET Data Protection, authenticated encryption) with the key ring persisted on a volume. Tested: round trip, tampering refused, other purpose refused, survives a restart, unreadable without the ring.
+- **Backups:** `scripts/backup.sh` / `restore.sh` (AES-256, PBKDF2) cover the database and the key ring; restore never overwrites the live database. A restore matched live exactly.
+- **Dependency finding fixed during this work:** the first Data Protection package version I added (10.0.4) carried a critical advisory (GHSA-9mv3-2cwr-p262, fixed in 10.0.7) and a transitive high one in System.Security.Cryptography.Pkcs (fixed in 10.0.13); it was moved to 10.0.14 and the scan is clean.
+- **Breaking change:** the web app no longer works at the old addresses (`:8080`, `:5000`); use `https://localhost:8443`. Login responses no longer contain a token.

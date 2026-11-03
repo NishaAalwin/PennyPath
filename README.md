@@ -11,11 +11,11 @@ First create your secrets file (never commit it): copy `.env.example` to `.env` 
 ```
 docker compose up --build
 ```
-- Web: http://localhost:8080
-- API: http://localhost:5000/api/health
+- App (web and API on one HTTPS origin): https://localhost:8443 (API health: https://localhost:8443/api/health)
 - Postgres (host): localhost:5433
 
-All ports bind to 127.0.0.1 only. Security notes and open items: [docs/security.md](docs/security.md)
+The certificate comes from Caddy's local CA, so the browser warns until you trust it (see [docs/operations.md](docs/operations.md)).
+All ports bind to 127.0.0.1 only; the API and web containers are reachable only through the proxy. Security notes and open items: [docs/security.md](docs/security.md)
 
 ## Configuration
 - `JWT_KEY` and `POSTGRES_PASSWORD` (in `.env`): required, there are no default secrets. `JWT_KEY` must be at least 32 bytes.
@@ -25,7 +25,7 @@ All ports bind to 127.0.0.1 only. Security notes and open items: [docs/security.
 # backend (needs PostgreSQL, e.g. `docker compose up db`)
 cd backend && dotnet run --project src/PennyPath.Api
 
-# frontend (needs Node >= 22.12)
+# frontend (needs Node >= 22.12); proxies /api to the backend on :5000 so the session cookie works
 cd frontend && npm install && npm run dev
 ```
 

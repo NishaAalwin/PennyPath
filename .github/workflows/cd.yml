@@ -29,6 +29,7 @@ jobs:
         with:
           context: frontend
           push: true
-          build-args: VITE_API_URL=${{ vars.API_URL }}
+          # The page and the API are served from one origin behind the proxy, so the API URL is empty (relative).
+          build-args: VITE_API_URL=
           tags: ghcr.io/${{ env.REPO }}-web:${{ github.ref_name }},ghcr.io/${{ env.REPO }}-web:latest
   # TODO: add a deploy job once the hosting target is chosen.

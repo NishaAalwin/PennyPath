@@ -2,7 +2,7 @@
 id: M6
 release: MVP
 status: done-with-gaps
-verified: 131 backend + 26 frontend tests; live on compose Postgres incl. 10,000-row timing (2026-11-03); charts rendered and viewed in light and dark; interactive hover/focus not browser-tested
+verified: 131 backend + 26 frontend tests; live on compose Postgres incl. 10,000-row timing (2026-11-03); charts rendered and viewed in light and dark; hover, keyboard focus and the numbers verified in a real browser (Edge)
 ---
 # M6 Monthly dashboard
 
@@ -30,11 +30,11 @@ User decision 2026-11-03 ([[Data minimisation]]): "summarised" means totals by *
 - [x] **Performance:** with 10,000 rows for one user in the compose Postgres, `/api/summary`, `/api/trend` (6 and 12 months) and `/api/transactions` each answered in about 0.22–0.32 s over 5 runs (curl, dev laptop, Docker). That is API time, not browser render. Totals matched a direct SQL sum exactly.
 - [x] **Charts** built with the `dataviz` skill: grouped columns for income vs spent (categorical slots 1–2, validated in light and dark: CVD ΔE ≥ 24.7, contrast ≥ 3:1), ranked horizontal bars (one hue, largest first, top 8 + "Other") for where/category, legend, "Show as table" under each, dark mode, 24px bar cap, 4px rounded data end, 2px pair gap — `frontend/src/TrendChart.tsx`, `BarList.tsx`, `charts.css`, `chartMath.ts` (unit tested)
 - [x] Rendered to HTML and viewed in Edge, light and dark: no overlap or clipping at 480px
-- [ ] Hover tooltip, keyboard focus and pointer behaviour **not tested in a browser** (only the static render was viewed)
+- [x] Hover tooltip, keyboard focus and pointer behaviour tested in a real browser: tooltip shows income/spent/saved on pointer and on keyboard focus and hides on leave; summary numbers match (Edge, `scripts/browser-e2e.mjs`)
 - [ ] No texture fallback (opt-in backup channel in the skill) and no direct labels on columns; identity rests on legend + tooltip + table
 - [ ] Negative net spend in a month (refunds larger than spending) is drawn as no column; the tooltip and table show the real value
 - [ ] Chart card carries its own light/dark surface because the app itself has no theme yet
 - [ ] Message with no date uses the import date (parser fallback), which can put it in the wrong month
-- [ ] Browser check of the panel
+- [x] Browser check of the panel (month picker, totals, bars, chart, tables)
 
 Depends on [[M5 Categorization]]. See [[Non-functional requirements]].

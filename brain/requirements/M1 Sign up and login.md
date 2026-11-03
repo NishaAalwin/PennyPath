@@ -2,7 +2,7 @@
 id: M1
 release: MVP
 status: done
-verified: API + unit tests (12 backend, 6 frontend); browser UI untested
+verified: API + unit tests; real browser (Edge) 2026-11-03: sign-up, log-in, wrong password, log-out, log-in again
 ---
 # M1 Sign up and login (JWT)
 
@@ -14,10 +14,11 @@ verified: API + unit tests (12 backend, 6 frontend); browser UI untested
 - [x] JWT: HS256 only, issuer/audience/expiry validated, key ≥ 32 bytes — `Infrastructure/Auth/JwtTokenService.cs`, `JwtOptions.cs`
 - [x] Lockout after 5 failures / 15 min; same response for unknown email vs wrong password
 - [x] Password policy 8–128, common-password list
-- [x] Frontend form + session — `frontend/src/AuthForm.tsx`, `session.ts`
-- [ ] Verified in a real browser
+- [x] Frontend form + session check — `frontend/src/AuthForm.tsx`, `App.tsx` (asks the server who is signed in; no client-side token)
+- [x] Verified in a real browser (`scripts/browser-e2e.mjs`)
+- [x] **Changed by [[M12 Security gate]]:** the token is no longer kept in `localStorage`; it lives only in an HttpOnly `__Host-pp_session` cookie, backed by server-side sessions (logout revokes), with CSRF protection
 
 ## Known gaps
-No email verification, password reset, MFA, token revocation. See [[Security checklist]].
+No email verification, password reset or MFA ([[M10 Account lifecycle]]); no refresh tokens (fixed 60-minute sessions). Sessions can be revoked since [[M12 Security gate]]. See [[Security checklist]].
 
 Related: [[Non-functional requirements]]

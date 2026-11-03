@@ -8,7 +8,6 @@ const inr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' 
 const PAGE_SIZE = 25
 
 type Props = {
-  token: string
   month: string
   categories: string[]
   /** Changes when something outside the list (an import) added rows. */
@@ -64,7 +63,7 @@ function EditRow({ row, onSave, onCancel, error }: EditRowProps) {
   )
 }
 
-export default function TransactionList({ token, month, categories, version, onChanged, onError }: Props) {
+export default function TransactionList({ month, categories, version, onChanged, onError }: Props) {
   const [search, setSearch] = useState('')
   const [debounced, setDebounced] = useState('')
   const [category, setCategoryFilter] = useState('')
@@ -85,7 +84,7 @@ export default function TransactionList({ token, month, categories, version, onC
 
   const load = useCallback(
     () =>
-      listTransactions(token, {
+      listTransactions({
         month: allMonths ? undefined : month,
         search: debounced || undefined,
         category: category || undefined,
@@ -95,7 +94,7 @@ export default function TransactionList({ token, month, categories, version, onC
       })
         .then(setData)
         .catch(onError),
-    [token, month, allMonths, debounced, category, type, page, onError],
+    [month, allMonths, debounced, category, type, page, onError],
   )
 
   useEffect(() => {
@@ -116,7 +115,7 @@ export default function TransactionList({ token, month, categories, version, onC
     if (Object.keys(changes).length === 0) return setEditingId(null)
     setEditError(null)
     try {
-      await updateTransaction(token, id, changes)
+      await updateTransaction(id, changes)
       setEditingId(null)
       await load()
       onChanged()
@@ -129,8 +128,10 @@ export default function TransactionList({ token, month, categories, version, onC
   const filtered = Boolean(debounced || category || type)
   const total = data?.total ?? 0
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const to = Math.min(page * PAGE_SIZE, total)
+  // The label describes the rows on screen (the page that was loaded), not the page just requested, so the two never disagree.
+  const shownPage = data?.page ?? page
+  const from = total === 0 ? 0 : (shownPage - 1) * PAGE_SIZE + 1
+  const to = Math.min(shownPage * PAGE_SIZE, total)
   const resetPage = <T,>(set: (v: T) => void) => (v: T) => {
     set(v)
     setPage(1)
@@ -181,7 +182,7 @@ export default function TransactionList({ token, month, categories, version, onC
                     <td>{t.merchant || '-'}</td>
                     <td>
                       <select aria-label={`Category for ${t.merchant || 'transaction'}`} value={t.category}
-                        onChange={(e) => act(() => setCategory(token, t.id, e.target.value))}>
+                        onChange={(e) => act(() => setCategory(t.id, e.target.value))}>
                         {(categories.length ? categories : [t.category]).map((c) => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </td>
@@ -189,17 +190,17 @@ export default function TransactionList({ token, month, categories, version, onC
                       {t.duplicateOfId ? (
                         <>
                           Possible duplicate{' '}
-                          <button onClick={() => act(() => notDuplicate(token, t.id))}>Not a duplicate</button>{' '}
-                          <button onClick={() => act(() => deleteTransaction(token, t.id))}>Delete</button>
+                          <button onClick={() => act(() => notDuplicate(t.id))}>Not a duplicate</button>{' '}
+                          <button onClick={() => act(() => deleteTransaction(t.id))}>Delete</button>
                         </>
                       ) : t.isTransfer ? (
                         <>
-                          Transfer <button onClick={() => act(() => setTransfer(token, t.id, false))}>Not a transfer</button>
+                          Transfer <button onClick={() => act(() => setTransfer(t.id, false))}>Not a transfer</button>
                         </>
                       ) : t.isRefund ? (
                         t.refundOfId ? 'Refund' : 'Refund (no matching purchase)'
                       ) : (
-                        <button onClick={() => act(() => setTransfer(token, t.id, true))}>Mark as transfer</button>
+                        <button onClick={() => act(() => setTransfer(t.id, true))}>Mark as transfer</button>
                       )}
                     </td>
                     <td align="right" style={{ color: t.type === 'Income' ? '#1b7f3b' : undefined }}>
@@ -215,7 +216,7 @@ export default function TransactionList({ token, month, categories, version, onC
           </table>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <button onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>Previous</button>
-            <span>{from}-{to} of {total} (page {page} of {pages})</span>
+            <span>{from}-{to} of {total} (page {shownPage} of {pages})</span>
             <button onClick={() => setPage((p) => p + 1)} disabled={page >= pages}>Next</button>
           </div>
         </>

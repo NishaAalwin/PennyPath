@@ -15,30 +15,32 @@ describe('splitMessages', () => {
 })
 
 describe('transactions api', () => {
-  it('importSms posts messages with the bearer token', async () => {
+  it('importSms posts messages with the session cookie and CSRF header, never a token', async () => {
     const f = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ imported: 1, duplicates: 0, unparsed: [] }) })
-    const res = await importSms('tok', ['a', 'b'], asFetch(f))
+    const res = await importSms(['a', 'b'], asFetch(f))
     expect(res.imported).toBe(1)
     const [url, init] = f.mock.calls[0]
     expect(url).toMatch(/\/api\/sms\/import$/)
-    expect(init.headers.Authorization).toBe('Bearer tok')
+    expect(init.headers.Authorization).toBeUndefined()
+    expect(init.headers['X-Requested-With']).toBe('PennyPath')
+    expect(init.credentials).toBe('same-origin')
     expect(JSON.parse(init.body)).toEqual({ messages: ['a', 'b'] })
   })
 
   it('listTransactions adds the month filter', async () => {
     const f = vi.fn().mockResolvedValue({ ok: true, json: async () => [] })
-    await listTransactions('tok', { month: '2026-11' }, asFetch(f))
+    await listTransactions({ month: '2026-11' }, asFetch(f))
     expect(f.mock.calls[0][0]).toMatch(/\/api\/transactions\?month=2026-11$/)
   })
 
   it('surfaces the server error', async () => {
     const f = vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: 'bad' }) })
-    await expect(importSms('tok', ['x'], asFetch(f))).rejects.toThrow('bad')
+    await expect(importSms(['x'], asFetch(f))).rejects.toThrow('bad')
   })
 
   it('setCategory PUTs the category and accepts an empty 204 response', async () => {
     const f = vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => { throw new Error('no body') } })
-    await expect(setCategory('tok', 'abc', 'Groceries', asFetch(f))).resolves.toBeUndefined()
+    await expect(setCategory('abc', 'Groceries', asFetch(f))).resolves.toBeUndefined()
     const [url, init] = f.mock.calls[0]
     expect(url).toMatch(/\/api\/transactions\/abc\/category$/)
     expect(init.method).toBe('PUT')
@@ -49,9 +51,9 @@ describe('transactions api', () => {
 
   it('setTransfer, notDuplicate and deleteTransaction use the right verbs and paths', async () => {
     const f = noContent()
-    await setTransfer('tok', 'a', true, asFetch(f))
-    await notDuplicate('tok', 'b', asFetch(f))
-    await deleteTransaction('tok', 'c', asFetch(f))
+    await setTransfer('a', true, asFetch(f))
+    await notDuplicate('b', asFetch(f))
+    await deleteTransaction('c', asFetch(f))
 
     const calls = f.mock.calls.map(([url, init]) => [init.method, String(url).replace(/^.*?\/api/, '/api')])
     expect(calls).toEqual([
@@ -65,13 +67,13 @@ describe('transactions api', () => {
   it('getSummary asks for the month and returns the summary', async () => {
     const body = { month: '2026-11', income: 1, expense: 2, savings: -1, byCategory: [], byMerchant: [], counted: 3, excluded: 0 }
     const f = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => body })
-    expect(await getSummary('tok', '2026-11', asFetch(f))).toEqual(body)
+    expect(await getSummary('2026-11', asFetch(f))).toEqual(body)
     expect(f.mock.calls[0][0]).toMatch(/\/api\/summary\?month=2026-11$/)
   })
 
   it('getTrend asks for the months ending at the chosen month', async () => {
     const f = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
-    await getTrend('tok', '2026-11', 6, asFetch(f))
+    await getTrend('2026-11', 6, asFetch(f))
     expect(f.mock.calls[0][0]).toMatch(/\/api\/trend\?months=6&to=2026-11$/)
   })
 
@@ -84,7 +86,7 @@ describe('transactions api', () => {
   it('updateTransaction PUTs only the given changes and returns the row', async () => {
     const row = { id: 'abc', amount: 300 }
     const f = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => row })
-    expect(await updateTransaction('tok', 'abc', { amount: 300 }, asFetch(f))).toEqual(row)
+    expect(await updateTransaction('abc', { amount: 300 }, asFetch(f))).toEqual(row)
     const [url, init] = f.mock.calls[0]
     expect(url).toMatch(/\/api\/transactions\/abc$/)
     expect(init.method).toBe('PUT')
@@ -93,6 +95,6 @@ describe('transactions api', () => {
 
   it('updateTransaction surfaces the server message on a refused edit', async () => {
     const f = vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: 'Amount must be more than 0.' }) })
-    await expect(updateTransaction('tok', 'abc', { amount: 0 }, asFetch(f))).rejects.toThrow('Amount must be more than 0.')
+    await expect(updateTransaction('abc', { amount: 0 }, asFetch(f))).rejects.toThrow('Amount must be more than 0.')
   })
 })
