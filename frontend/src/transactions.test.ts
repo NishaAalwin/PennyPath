@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { deleteTransaction, getSummary, getTrend, notDuplicate, setTransfer, importSms, listTransactions, setCategory, splitMessages } from './transactions'
+import { deleteTransaction, getSummary, getTrend, transactionsQuery, updateTransaction, notDuplicate, setTransfer, importSms, listTransactions, setCategory, splitMessages } from './transactions'
 
 const asFetch = (f: unknown) => f as unknown as typeof fetch
 
@@ -27,7 +27,7 @@ describe('transactions api', () => {
 
   it('listTransactions adds the month filter', async () => {
     const f = vi.fn().mockResolvedValue({ ok: true, json: async () => [] })
-    await listTransactions('tok', '2026-11', asFetch(f))
+    await listTransactions('tok', { month: '2026-11' }, asFetch(f))
     expect(f.mock.calls[0][0]).toMatch(/\/api\/transactions\?month=2026-11$/)
   })
 
@@ -73,5 +73,26 @@ describe('transactions api', () => {
     const f = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
     await getTrend('tok', '2026-11', 6, asFetch(f))
     expect(f.mock.calls[0][0]).toMatch(/\/api\/trend\?months=6&to=2026-11$/)
+  })
+
+  it('transactionsQuery sends only the filters that are set and encodes them', () => {
+    expect(transactionsQuery({})).toBe('')
+    expect(transactionsQuery({ search: 'a&b=c d', type: 'Income', page: 2, pageSize: 25 })).toBe('?q=a%26b%3Dc+d&type=Income&page=2&pageSize=25')
+    expect(transactionsQuery({ month: '2026-11', category: 'Food & Dining' })).toBe('?month=2026-11&category=Food+%26+Dining')
+  })
+
+  it('updateTransaction PUTs only the given changes and returns the row', async () => {
+    const row = { id: 'abc', amount: 300 }
+    const f = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => row })
+    expect(await updateTransaction('tok', 'abc', { amount: 300 }, asFetch(f))).toEqual(row)
+    const [url, init] = f.mock.calls[0]
+    expect(url).toMatch(/\/api\/transactions\/abc$/)
+    expect(init.method).toBe('PUT')
+    expect(JSON.parse(init.body)).toEqual({ amount: 300 })
+  })
+
+  it('updateTransaction surfaces the server message on a refused edit', async () => {
+    const f = vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: 'Amount must be more than 0.' }) })
+    await expect(updateTransaction('tok', 'abc', { amount: 0 }, asFetch(f))).rejects.toThrow('Amount must be more than 0.')
   })
 })

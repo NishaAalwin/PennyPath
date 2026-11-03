@@ -172,6 +172,110 @@ public partial class TransactionService(AppDbContext db, ITransactionParser pars
         return SummaryCalculator.Compute(start.ToString("yyyy-MM", CultureInfo.InvariantCulture), rows);
     }
 
+    public const int MaxPageSize = 100;
+    public const int MaxSearchLength = 100;
+    public const int MaxMerchantLength = 200;
+    public const decimal MaxAmount = 999_999_999.99m;
+    public static readonly DateOnly MinDate = new(2000, 1, 1);
+
+    public async Task<PagedTransactions> QueryAsync(Guid userId, TransactionQuery query, CancellationToken ct = default)
+    {
+        if (query.Page < 1) throw new ArgumentException("page must be 1 or more", nameof(query));
+        if (query.PageSize < 1 || query.PageSize > MaxPageSize) throw new ArgumentException($"pageSize must be 1-{MaxPageSize}", nameof(query));
+
+        var q = db.Transactions.Where(t => t.UserId == userId);
+
+        if (query.Month is not null)
+        {
+            if (!DateOnly.TryParseExact(query.Month + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start))
+                throw new ArgumentException("month must be formatted yyyy-MM", nameof(query));
+            var end = start.AddMonths(1);
+            q = q.Where(t => t.Date >= start && t.Date < end);
+        }
+        if (query.From is { } from) q = q.Where(t => t.Date >= from);
+        if (query.To is { } to) q = q.Where(t => t.Date <= to);
+        if (query.Type is { } type) q = q.Where(t => t.Type == type);
+        if (query.Category is not null)
+        {
+            if (!Categories.IsValid(query.Category)) throw new ArgumentException("unknown category", nameof(query));
+            var category = query.Category;
+            q = q.Where(t => t.Category == category);
+        }
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var term = query.Search.Trim();
+            if (term.Length > MaxSearchLength) throw new ArgumentException("search is too long", nameof(query));
+            var lower = term.ToLowerInvariant();
+            q = decimal.TryParse(term, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount)
+                ? q.Where(t => t.Merchant.ToLower().Contains(lower) || t.Amount == amount)
+                : q.Where(t => t.Merchant.ToLower().Contains(lower));
+        }
+
+        var total = await q.CountAsync(ct);
+        var items = await q.OrderByDescending(t => t.Date).ThenByDescending(t => t.CreatedAt).ThenBy(t => t.Id)
+            .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
+            .Select(t => new TransactionDto(t.Id, t.Date, t.Amount, t.Type, t.Merchant, t.Category, t.Source,
+                t.IsTransfer, t.IsRefund, t.RefundOfId, t.DuplicateOfId))
+            .ToListAsync(ct);
+        return new PagedTransactions(items, total, query.Page, query.PageSize);
+    }
+
+    public async Task<EditResult> UpdateAsync(Guid userId, Guid transactionId, UpdateTransactionRequest request, CancellationToken ct = default)
+    {
+        var tx = await db.Transactions.FirstOrDefaultAsync(t => t.Id == transactionId && t.UserId == userId, ct);
+        if (tx is null) return new EditResult(false, null, null);
+
+        if (request.Merchant is null && request.Amount is null && request.Date is null && request.Type is null)
+            return Refused("Nothing to change.");
+
+        var merchant = request.Merchant?.Trim();
+        if (merchant is not null && (merchant.Length > MaxMerchantLength || merchant.Any(char.IsControl)))
+            return Refused($"Where it was spent must be at most {MaxMerchantLength} characters, without control characters.");
+        if (request.Amount is { } a && (a <= 0 || a > MaxAmount || decimal.Round(a, 2) != a))
+            return Refused("Amount must be more than 0, at most 999,999,999.99, with at most 2 decimals.");
+        var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
+        if (request.Date is { } date && (date < MinDate || date > today.AddDays(1)))
+            return Refused("Date must be between 2000-01-01 and tomorrow.");
+        if (request.Type is { } type && !Enum.IsDefined(type))
+            return Refused("Type must be Income or Expense.");
+
+        var changed =
+            (merchant is not null && merchant != tx.Merchant) || (request.Amount is { } na && na != tx.Amount)
+            || (request.Date is { } nd && nd != tx.Date) || (request.Type is { } nt && nt != tx.Type);
+
+        if (merchant is not null) tx.Merchant = merchant;
+        if (request.Amount is { } newAmount) tx.Amount = newAmount;
+        if (request.Date is { } newDate) tx.Date = newDate;
+        if (request.Type is { } newType)
+        {
+            tx.Type = newType;
+            if (newType == TransactionType.Expense) tx.IsRefund = false;
+        }
+
+        if (changed)
+        {
+            if (!tx.CategoryIsManual && !tx.IsTransfer) tx.Category = categorizer.Categorize(tx.Merchant, tx.Type);
+
+            // The user has corrected this row, so earlier guesses about it no longer hold.
+            tx.DuplicateOfId = null;
+            tx.RefundOfId = null;
+            var pointing = await db.Transactions
+                .Where(t => t.UserId == userId && (t.DuplicateOfId == transactionId || t.RefundOfId == transactionId))
+                .ToListAsync(ct);
+            foreach (var t in pointing)
+            {
+                if (t.DuplicateOfId == transactionId) t.DuplicateOfId = null;
+                if (t.RefundOfId == transactionId) t.RefundOfId = null;
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+        return new EditResult(true, null, new TransactionDto(tx.Id, tx.Date, tx.Amount, tx.Type, tx.Merchant, tx.Category,
+            tx.Source, tx.IsTransfer, tx.IsRefund, tx.RefundOfId, tx.DuplicateOfId));
+
+        static EditResult Refused(string message) => new(true, message, null);
+    }
+
     public const int MinTrendMonths = 2;
     public const int MaxTrendMonths = 12;
 

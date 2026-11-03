@@ -28,6 +28,7 @@ public class AuthEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [InlineData("DELETE", "/api/transactions/3fa85f64-5717-4562-b3fc-2c963f66afa6")]
     [InlineData("POST", "/api/transactions/3fa85f64-5717-4562-b3fc-2c963f66afa6/not-duplicate")]
     [InlineData("PUT", "/api/transactions/3fa85f64-5717-4562-b3fc-2c963f66afa6/transfer")]
+    [InlineData("PUT", "/api/transactions/3fa85f64-5717-4562-b3fc-2c963f66afa6")]
     [InlineData("PUT", "/api/transactions/3fa85f64-5717-4562-b3fc-2c963f66afa6/category")]
     public async Task Transaction_endpoints_require_authentication(string method, string url)
     {

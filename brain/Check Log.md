@@ -2,6 +2,13 @@
 
 Newest first. One entry per task: date · task · notes checked · result · gaps.
 
+## 2026-11-03 · M7 transaction list: search, filter, edit, pagination
+- Notes checked: [[M7 Transaction list]], [[Security checklist]], [[Non-functional requirements]], [[M5 Categorization]] and [[M9 Data quality]] (edit side effects), [[Data minimisation]] (no new stored fields).
+- Result: **pass, with gaps.** Backend 159 tests, frontend 29 tests, lint, build, `npm audit` (high) clean; no new packages; no migration. Live on compose Postgres with 10,000 rows: search/type/category+month/date-range counts equal direct SQL counts; wildcard and injection-style search return 0 and delete nothing; page, size, type, category, month, date and 101-character search all return 400; edit works, validation messages shown, other user 404, no token 401; each list query ~0.21–0.24 s. Test users and rows were deleted afterwards.
+- Security walk: edit and list are `[Authorize]`, owner from the token, owner-scoped queries, server-side validation and caps (search 100, page size 100, merchant 200, amount range, date range), EF-parameterised search, no secrets, no new data stored.
+- Gaps: UI not browser-tested; edit does not re-run duplicate/refund detection; fixed sort order; no amount-range filter.
+- Mistake caught: my first long-search check was truncated by the test script, so I reran it properly (101 chars → 400).
+
 ## 2026-11-03 · M6 completion: trend, charts, performance
 - Notes checked: [[M6 Monthly dashboard]], [[Non-functional requirements]], [[Security checklist]], [[Data minimisation]] (summary uses only stored fields), [[M9 Data quality]] (exclusion rules reused).
 - Result: **pass, with gaps.** Backend 131 tests, frontend 26 tests, lint, build, `npm audit` (high) clean. New `GET /api/trend` is `[Authorize]`, owner-scoped, validated (2–12 months). Palette run through the dataviz validator in light and dark (all checks pass). Charts rendered with the real components and viewed in Edge, light and dark. With 10,000 rows in the compose Postgres each endpoint took ~0.22–0.32 s; September totals matched a direct SQL sum exactly. Test user and rows were deleted afterwards.

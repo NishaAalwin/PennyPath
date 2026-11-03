@@ -21,7 +21,7 @@ Every task is checked against this vault before it is called done. See [[Task Pr
 | M4 | done (paste import) |
 | M5 | rules + user correction done; AI fallback deferred; accuracy unmeasured |
 | M6 | done with gaps: summary, trend, charts and 10k-row timing done; browser hover/focus untested, no texture fallback |
-| M7 | partial (list only) |
+| M7 | done with gaps: search, filters, paging and edit built and live-verified on 10k rows; UI not browser-tested; manual add is M11 |
 | M8 | done (Docker + CI green) |
 | M9 | done with gaps: flags duplicates, links refunds, manual transfers; no email source yet, accuracy unmeasured |
 | M10 | not started (new) |

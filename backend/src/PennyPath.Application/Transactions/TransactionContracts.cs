@@ -14,6 +14,20 @@ public record TransactionDto(
 
 public record SetTransferRequest(bool IsTransfer);
 
+/// <summary>Filters for the list. Every filter is optional; they combine with AND.</summary>
+public record TransactionQuery(
+    string? Month = null, DateOnly? From = null, DateOnly? To = null, string? Search = null,
+    string? Category = null, TransactionType? Type = null, int Page = 1, int PageSize = 50);
+
+public record PagedTransactions(IReadOnlyList<TransactionDto> Items, int Total, int Page, int PageSize);
+
+/// <summary>Only the fields that are present are changed.</summary>
+public record UpdateTransactionRequest(string? Merchant, decimal? Amount, DateOnly? Date, TransactionType? Type);
+
+/// <param name="Found">False when the transaction does not exist or belongs to someone else.</param>
+/// <param name="Error">A message for the user when the change was refused.</param>
+public record EditResult(bool Found, string? Error, TransactionDto? Transaction);
+
 public enum TransactionActionResult { Done, NotFound }
 
 public record UpdateCategoryRequest(string? Category);
@@ -44,6 +58,13 @@ public interface ITransactionService
     /// </summary>
     Task<IReadOnlyList<TrendMonth>> TrendAsync(Guid userId, int months, string? to, CancellationToken ct = default);
 
+    /// <summary>Search, filter and page through the user's transactions (newest first).</summary>
+    Task<PagedTransactions> QueryAsync(Guid userId, TransactionQuery query, CancellationToken ct = default);
+
+    /// <summary>Edit merchant, amount, date or direction of the user's own transaction.</summary>
+    Task<EditResult> UpdateAsync(Guid userId, Guid transactionId, UpdateTransactionRequest request, CancellationToken ct = default);
+
+    /// <summary>All rows for a month, unpaged (for exports and tests; the API list endpoint is paged).</summary>
     /// <param name="month">Optional "yyyy-MM" filter.</param>
     Task<IReadOnlyList<TransactionDto>> ListAsync(Guid userId, string? month, CancellationToken ct = default);
 }

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PennyPath.Application.Transactions;
+using PennyPath.Domain.Entities;
 
 namespace PennyPath.Api.Controllers;
 
@@ -76,15 +77,25 @@ public class TransactionsController(ITransactionService transactions) : Controll
     }
 
     [HttpGet("api/transactions")]
-    public async Task<IActionResult> List([FromQuery] string? month, CancellationToken ct)
+    public async Task<IActionResult> List(
+        [FromQuery] string? month, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, [FromQuery(Name = "q")] string? search,
+        [FromQuery] string? category, [FromQuery] TransactionType? type,
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default)
     {
         try
         {
-            return Ok(await transactions.ListAsync(UserId, month, ct));
+            return Ok(await transactions.QueryAsync(UserId, new TransactionQuery(month, from, to, search, category, type, page, pageSize), ct));
         }
-        catch (ArgumentException)
+        catch (ArgumentException e)
         {
-            return BadRequest(new { error = "month must be formatted yyyy-MM." });
+            return BadRequest(new { error = e.Message.Split(" (Parameter")[0] });
         }
+    }
+
+    [HttpPut("api/transactions/{id:guid}")]
+    public async Task<IActionResult> Edit(Guid id, UpdateTransactionRequest request, CancellationToken ct)
+    {
+        var r = await transactions.UpdateAsync(UserId, id, request, ct);
+        return !r.Found ? NotFound() : r.Error is not null ? BadRequest(new { error = r.Error }) : Ok(r.Transaction);
     }
 }

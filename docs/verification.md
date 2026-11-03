@@ -145,3 +145,19 @@ User decision: read and keep only amount, where/what (merchant), date and debit/
 - No texture fallback for colour-vision/print/forced-colors beyond the validated colour pair and the table view.
 - `GET /api/transactions` returns every row (10,000 rows answered in ~0.25 s here); pagination belongs to M7.
 - A month where refunds exceed spending has negative net spend; the chart shows no column for it, the tooltip and table show the value.
+
+## M7: transaction list search, filter, edit, pagination (2026-11-03)
+
+| Check | Status | Notes |
+|---|---|---|
+| Backend tests | 159 pass | Adds search (case, partial, amount, wildcards, quotes), filters and AND, ordering, paging (every row once), limits, edit fields/validation/side effects, per-user, 401 |
+| Frontend tests, lint, build, `npm audit` | Verified (Node 24) | 29 tests pass; no vulnerabilities |
+| Dependency audit (NuGet) | Clean | No new packages; no migration |
+| Compose end-to-end, 10,000 rows | **Verified** | Counts for search, type, category+month and date range equal direct SQL counts; `%` and an injection-style string match nothing and delete nothing; page/pageSize/type/category/month/from/101-char search → 400; last page returns the remaining rows; edit applies and the category follows the new merchant; invalid edits → 400 with a message; other user → 404; no token → 401 |
+| Timing, 10,000 rows | **Measured** | Each list query ~0.21–0.24 s over 5 runs (curl, dev laptop, Docker); default page is ~12 KB |
+| Search box, paging buttons, edit form in a real browser | Not verified | Same browser limitation as before |
+
+### Known limitations
+- Editing clears old duplicate/refund guesses but does not look for new ones.
+- Sorting is newest first only; there is no amount-range filter; searching a number matches the exact amount.
+- `GET /api/transactions` now returns `{items,total,page,pageSize}` instead of a bare array (a breaking change for any other client; the web app was updated).
