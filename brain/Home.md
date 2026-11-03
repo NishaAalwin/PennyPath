@@ -7,7 +7,7 @@ Every task is checked against this vault before it is called done. See [[Task Pr
 ## Map
 - [[Task Protocol]] — the check that runs on every task
 - Requirements (one note per item, each with a *Code check* list)
-  - MVP: [[M1 Sign up and login]] · [[M2 Gmail import]] · [[M3 Transaction parser]] · [[M4 SMS import]] · [[M5 Categorization]] · [[M6 Monthly dashboard]] · [[M7 Transaction list]] · [[M8 Docker and CI]]
+  - MVP: [[M1 Sign up and login]] · [[M2 Gmail import]] · [[M3 Transaction parser]] · [[M4 SMS import]] · [[M5 Categorization]] · [[M6 Monthly dashboard]] · [[M7 Transaction list]] · [[M8 Docker and CI]] · [[M9 Data quality]] · [[M10 Account lifecycle]] · [[M11 Manual transaction]] · [[M12 Security gate]]
   - Later: [[Later releases]]
   - Cross-cutting: [[Non-functional requirements]] · [[Security checklist]] · [[Constraints and decisions]]
 - [[Check Log]] — result of every task check, newest first
@@ -23,6 +23,10 @@ Every task is checked against this vault before it is called done. See [[Task Pr
 | M6 | not started |
 | M7 | partial (list only) |
 | M8 | done (Docker + CI green) |
+| M9 | not started (new) |
+| M10 | not started (new) |
+| M11 | not started (new) |
+| M12 | not started (new); must finish before M2 ships |
 
 Keep this table and each note's `status:` in sync when a task lands.
 

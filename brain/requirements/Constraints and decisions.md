@@ -17,6 +17,12 @@ India, INR, UPI (open decision).
 1. Country/currency focus confirmation
 2. Android: React Native vs Kotlin
 3. Hosting: Azure / AWS / VPS
+4. MVP audience: author + ≤ 100 Gmail test users (recommended) vs public launch (needs Google verification and audit)
+5. Move the Android SMS app (C1) earlier than v0.3? Pasting SMS weakens the "no manual logging" promise
+6. Do investment ideas (S1) fall under SEBI investment-advice rules? Check before building S1
+7. Is AI categorization acceptable? Recommended: opt-in, merchant text only
+
+Resolve these with the user, record the answer here, then update `docs/requirements.md`. Requirements review of 2026-11-03 produced items 4–7 and M9–M12.
 
 ## User working preferences
 SDLC phases; verify each layer before building on it; document anything unverified in `docs/verification.md`; never ask for DB superuser passwords.
