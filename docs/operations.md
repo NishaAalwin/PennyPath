@@ -101,3 +101,16 @@ docker compose build --pull
 ./scripts/scan-images.sh        # needs Docker; downloads the Trivy scanner image and its database once
 ```
 Exit code 1 means a HIGH or CRITICAL finding that already has a fix. After a rebuild, API, web and proxy system layers are clean; the open findings (Caddy binary, `gosu` in Postgres) are listed in docs/security.md. Run it after every pull and before exposing the app beyond your own machine.
+
+## 10. Accounts: email, password reset, two-factor, deletion (M10)
+
+**Email.** New accounts must open a link emailed to them before they can use their data (accounts that existed before this feature count as verified). Password reset also works by emailed link. Links carry the token after a `#`, work once, and expire (verify 24 hours, reset 30 minutes).
+- **Locally** the app sends mail to **Mailpit**, a catcher that shows every message at **http://127.0.0.1:8025** (loopback only, messages kept in memory). Sign up, open that page, click the link.
+- **For real email** set in `.env`: `SMTP_HOST`, `SMTP_PORT` (usually 587), `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, and `SMTP_USE_TLS=true`; the app refuses to send a mail password without TLS. Then remove the `mailpit` service. Set `SITE_ADDRESS` to your domain so links point there. The real-server path has not been tested yet.
+- To switch verification off (for example where no mail can be sent) set `Auth__RequireVerifiedEmail: "false"` on the `api` service; new accounts then count as verified at once.
+
+**Forgot your password.** Log-in screen, "Forgot your password?". A reset signs out every device, clears any lockout and also marks the email verified. It does **not** switch two-factor off.
+
+**Two-factor login (optional).** Privacy and security tab, "Set up two-factor login": type the key into an authenticator app, enter the 6-digit code, and save the 10 one-time **recovery codes** (shown once). Signing in then needs the password and a code. Lost the phone: use a recovery code, then turn two-factor off and on again for fresh codes. Lost both phone and recovery codes: there is no self-service way back in; an operator would have to clear the account's two-factor settings in the database.
+
+**Your data and deletion.** The same tab downloads everything stored about you as JSON (no password hash or token), and deletes the account and all its data after the password (and a code) is confirmed again. Old backups made before a deletion still contain the account; delete them if that matters.

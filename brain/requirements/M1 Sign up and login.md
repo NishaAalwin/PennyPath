@@ -19,6 +19,6 @@ verified: API + unit tests; real browser (Edge) 2026-11-03: sign-up, log-in, wro
 - [x] **Changed by [[M12 Security gate]]:** the token is no longer kept in `localStorage`; it lives only in an HttpOnly `__Host-pp_session` cookie, backed by server-side sessions (logout revokes), with CSRF protection
 
 ## Known gaps
-No email verification, password reset or MFA ([[M10 Account lifecycle]]); no refresh tokens (fixed 60-minute sessions). Sessions can be revoked since [[M12 Security gate]]. See [[Security checklist]].
+Email verification, password reset and optional two-factor were added by [[M10 Account lifecycle]] (2026-11-04); no refresh tokens (fixed 60-minute sessions). Sessions can be revoked since [[M12 Security gate]]. See [[Security checklist]].
 
 Related: [[Non-functional requirements]]

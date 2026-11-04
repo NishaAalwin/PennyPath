@@ -110,6 +110,30 @@ namespace PennyPath.Infrastructure.Persistence.Migrations
                     b.ToTable("GmailOAuthStates");
                 });
 
+            modelBuilder.Entity("PennyPath.Domain.Entities.RecoveryCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CodeHash");
+
+                    b.ToTable("RecoveryCodes");
+                });
+
             modelBuilder.Entity("PennyPath.Domain.Entities.Session", b =>
                 {
                     b.Property<Guid>("Id")
@@ -223,14 +247,26 @@ namespace PennyPath.Infrastructure.Persistence.Migrations
                         .HasMaxLength(254)
                         .HasColumnType("character varying(254)");
 
+                    b.Property<bool>("EmailVerified")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("FailedLoginCount")
                         .HasColumnType("integer");
 
                     b.Property<DateTime?>("LockoutEnd")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("MfaEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("MfaLastStep")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProtectedMfaSecret")
                         .HasColumnType("text");
 
                     b.HasKey("Id");
@@ -239,6 +275,44 @@ namespace PennyPath.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("PennyPath.Domain.Entities.UserToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "Purpose", "CreatedAt");
+
+                    b.ToTable("UserTokens");
                 });
 
             modelBuilder.Entity("PennyPath.Domain.Entities.AuditEvent", b =>
@@ -267,6 +341,15 @@ namespace PennyPath.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("PennyPath.Domain.Entities.RecoveryCode", b =>
+                {
+                    b.HasOne("PennyPath.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("PennyPath.Domain.Entities.Session", b =>
                 {
                     b.HasOne("PennyPath.Domain.Entities.User", null)
@@ -277,6 +360,15 @@ namespace PennyPath.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("PennyPath.Domain.Entities.Transaction", b =>
+                {
+                    b.HasOne("PennyPath.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PennyPath.Domain.Entities.UserToken", b =>
                 {
                     b.HasOne("PennyPath.Domain.Entities.User", null)
                         .WithMany()

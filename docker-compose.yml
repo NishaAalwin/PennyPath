@@ -28,6 +28,16 @@ services:
       Database__MigrateOnStartup: "true"
       # Do not log every SQL statement; fewer details in the logs.
       Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command: Warning
+      # Links in emails (verify email, reset password) point here.
+      App__PublicUrl: https://${SITE_ADDRESS:-localhost:8443}
+      # Outgoing mail. By default it goes to the local Mailpit catcher (read it at http://127.0.0.1:8025); nothing leaves the machine.
+      # For a real mail server set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM and SMTP_USE_TLS=true in .env.
+      Smtp__Host: ${SMTP_HOST:-mailpit}
+      Smtp__Port: ${SMTP_PORT:-1025}
+      Smtp__UseTls: ${SMTP_USE_TLS:-false}
+      Smtp__User: ${SMTP_USER:-}
+      Smtp__Password: ${SMTP_PASSWORD:-}
+      Smtp__From: ${SMTP_FROM:-PennyPath <no-reply@pennypath.local>}
       # Trust X-Forwarded-For/-Proto only from the proxy's fixed address, so rate limits and the audit log see the real client.
       ForwardedHeaders__KnownProxies__0: 172.28.0.10
       # Key ring for encrypting stored secrets. It lives on a volume so it survives restarts and rebuilds.
@@ -43,6 +53,25 @@ services:
         condition: service_healthy
     expose:
       - "8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  # Local mail catcher for development: shows the emails the app sends (verification, password reset). Open
+  # http://127.0.0.1:8025. Messages are kept in memory only. For real mail, set SMTP_* in .env and remove this service.
+  mailpit:
+    image: axllent/mailpit:v1.21.8
+    user: "65534:65534"
+    environment:
+      MP_MAX_MESSAGES: "200"
+    ports:
+      - "127.0.0.1:8025:8025" # the inbox page, loopback only
+    expose:
+      - "1025" # SMTP, reachable by the API only
     read_only: true
     tmpfs:
       - /tmp

@@ -216,3 +216,19 @@ User decision: read and keep only amount, where/what (merchant), date and debit/
 | Image scan | **Verified, with open items** | API, web, proxy system layers 0 fixable; Caddy binary 6 HIGH and gosu in Postgres 26 HIGH (Go runtime) remain |
 | Real Google, real bank email formats, pen test | **Not verified** | unchanged |
 | Whether your bank passes Gmail DKIM/DMARC | **Not verified** | skipped emails are counted in the sync result so this shows up on the first real sync |
+
+## M10 account lifecycle (2026-11-04)
+| Check | Result | Evidence |
+|---|---|---|
+| Backend tests | **Verified** | 348 pass (79 new): TOTP against RFC 6238 vectors, verification, reset, deletion, export, two-factor, SMTP guard, and the same flows over HTTP with verification switched on |
+| Frontend | **Verified** | 54 tests, lint, typecheck, build, audit clean |
+| Migration on real Postgres | **Verified** | `AddAccountLifecycle` applied; existing accounts show `EmailVerified = true`; no database default left on the column |
+| Browser, real UI | **Verified** | 67/67: confirm-email screen holds a new account, link verifies and token leaves the address bar, link works once, forgot answers identically, reset form, old password dies, new works, two-factor setup (wrong code refused, right code gives 10 recovery codes), export, sign-in asks for the code, wrong code refused, deletion refused with a wrong password then done with a recovery code, deleted account cannot sign in |
+| Deletion on real Postgres | **Verified** | after two browser deletions: both users gone; 0 orphan rows in Transactions, Sessions, AuditEvents, UserTokens, RecoveryCodes, GmailConnections; 2 content-free AccountDeleted events |
+| Logs hold no tokens, codes or passwords | **Verified** | searched the API logs on the live stack: 0 hits |
+| New image (Mailpit) | **Verified** | scanned: 0 fixable HIGH/CRITICAL |
+| Real mail server | **Not verified** | only Mailpit tested |
+| Two parallel requests using the same TOTP code | **Not verified / known gap** | no row lock |
+
+### Known limitations
+- Old e2e/test accounts from earlier runs remain in the local database (all marked verified). They are harmless test rows.

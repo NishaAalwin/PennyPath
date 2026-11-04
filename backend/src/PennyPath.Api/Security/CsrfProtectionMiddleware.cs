@@ -13,7 +13,8 @@ public sealed class CsrfProtectionMiddleware(RequestDelegate next)
     public const string CookieAuthItem = "pp.auth-from-cookie";
 
     private static readonly HashSet<string> SafeMethods = new(StringComparer.OrdinalIgnoreCase) { "GET", "HEAD", "OPTIONS", "TRACE" };
-    private static readonly string[] AnonymousStateChanging = ["/api/auth/login", "/api/auth/register"];
+    private static readonly string[] AnonymousStateChanging =
+        ["/api/auth/login", "/api/auth/register", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/verify-email"];
 
     public async Task InvokeAsync(HttpContext ctx)
     {

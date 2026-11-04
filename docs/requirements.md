@@ -34,7 +34,7 @@ PennyPath is a personal finance app. It reads a person's bank/payment emails (Gm
 - M7. Transaction list with search, filter and edit.
 - M8. Deployed with Docker and a CI pipeline (also a continuous requirement: CI stays green on every commit).
 - M9. Data quality: cross-source duplicate detection (SMS vs email), own-account transfers (marked by the user) excluded from income and expense, refunds and reversals handled, and unparseable messages reported to the user at import time (their text is not stored).
-- M10. Account lifecycle: email verification, password reset, and "delete my account and all my data".
+- M10. Account lifecycle: email verification, password reset, "delete my account and all my data", data export, and optional two-factor login (TOTP). Scope widened 2026-11-04 at the user's request.
 - M11. Manual add of a transaction (fallback when the parser fails).
 - M12. Security gate before M2: HTTPS, safer token storage, consent screen for AI use, and the open items in `docs/security.md` that are marked as blocking Gmail.
 

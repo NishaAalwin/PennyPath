@@ -24,7 +24,7 @@ Every task is checked against this vault before it is called done. See [[Task Pr
 | M7 | done with gaps: search, filters, paging and edit built and live-verified on 10k rows; UI not browser-tested; manual add is M11 |
 | M8 | done (Docker + CI green) |
 | M9 | done with gaps: flags duplicates, links refunds, manual transfers; no email source yet, accuracy unmeasured |
-| M10 | not started (new) |
+| M10 | done with gaps: email verification, password reset, optional TOTP two-factor, export, delete-my-account (rows proven gone on real Postgres); real SMTP not tested, sign-up still reveals existing emails |
 | M11 | not started (new) |
 | DM1 | done: only amount, where/what, date, debit/credit stored (PostgreSQL) |
 | M12 | done with gaps: HTTPS proxy, cookie sessions + CSRF, revocation, audit log, AI consent, key ring + encryption service, tested backups, real-browser check; user actions and disk encryption remain; M2 may now proceed |

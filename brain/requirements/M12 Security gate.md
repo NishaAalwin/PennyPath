@@ -26,7 +26,7 @@ verified: 193 backend + 32 frontend tests; live over HTTPS on the compose stack;
 - [x] Dependency scan clean (a vulnerable Data Protection version I first added was caught and moved to 10.0.14)
 
 ## Known gaps
-- Refresh tokens/sliding sessions, MFA, email verification and password reset ([[M10 Account lifecycle]]) are not built.
+- Refresh tokens/sliding sessions are not built. MFA, email verification and password reset were built in [[M10 Account lifecycle]] (2026-11-04).
 - No alerting or monitoring on the audit log.
 - Local HTTPS uses Caddy's own CA; a real domain is needed for a public deployment (hosting undecided).
 - Docker images scanned 2026-11-04 (`scripts/scan-images.sh`): own layers clean; open: Caddy binary (Go runtime) and gosu in the Postgres image. Not penetration tested.

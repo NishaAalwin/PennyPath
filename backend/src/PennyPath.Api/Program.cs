@@ -8,14 +8,18 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using PennyPath.Api.Email;
 using PennyPath.Api.Security;
+using PennyPath.Application.Account;
 using PennyPath.Application.Auth;
 using PennyPath.Application.Categorization;
 using PennyPath.Application.Gmail;
 using PennyPath.Application.Parsing;
 using PennyPath.Application.Security;
 using PennyPath.Application.Transactions;
+using PennyPath.Infrastructure.Account;
 using PennyPath.Infrastructure.Auth;
+using PennyPath.Infrastructure.Email;
 using PennyPath.Infrastructure.Gmail;
 using PennyPath.Infrastructure.Persistence;
 using PennyPath.Infrastructure.Security;
@@ -43,6 +47,16 @@ builder.Services.AddDbContext<AppDbContext>(o =>
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.Section));
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.Section));
+builder.Services.Configure<AppOptions>(builder.Configuration.GetSection(AppOptions.Section));
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.Section));
+builder.Services.AddScoped<IMfaVerifier, MfaVerifier>();
+builder.Services.AddScoped<IAccountService, AccountService>();
+// Email is queued and sent in the background, so a slow mail server cannot slow or reveal anything about a request.
+builder.Services.AddSingleton<QueuedEmailSender>();
+builder.Services.AddSingleton<IEmailSender>(sp => sp.GetRequiredService<QueuedEmailSender>());
+builder.Services.AddSingleton<IEmailTransport, SmtpEmailTransport>();
+builder.Services.AddHostedService<EmailDispatcher>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IAuditLog, AuditLog>();
 builder.Services.AddScoped<IAiConsent, AiConsentService>();
@@ -100,14 +114,24 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 {
                     var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
                     var now = ctx.HttpContext.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime;
-                    ok = await db.Sessions.AnyAsync(x => x.Id == sessionId && x.UserId == userId && x.RevokedAt == null && x.ExpiresAt > now,
-                        ctx.HttpContext.RequestAborted);
+                    var verified = await (from s in db.Sessions
+                                          join u in db.Users on s.UserId equals u.Id
+                                          where s.Id == sessionId && s.UserId == userId && s.RevokedAt == null && s.ExpiresAt > now
+                                          select (bool?)u.EmailVerified).FirstOrDefaultAsync(ctx.HttpContext.RequestAborted);
+                    ok = verified is not null;
+                    // Whether the email is verified comes from the database on every request, never from the token.
+                    if (ok) ((ClaimsIdentity)ctx.Principal!.Identity!).AddClaim(new Claim("email_verified", verified == true ? "true" : "false"));
                 }
                 if (!ok) ctx.Fail("The session has ended.");
             },
         };
     });
-builder.Services.AddAuthorization();
+// Every [Authorize] needs a verified email by default; only the few account endpoints named "Authenticated" do not.
+builder.Services.AddAuthorization(o =>
+{
+    o.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder().RequireAuthenticatedUser().RequireClaim("email_verified", "true").Build();
+    o.AddPolicy("Authenticated", p => p.RequireAuthenticatedUser());
+});
 
 static string ClientKey(HttpContext ctx) => ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
@@ -122,6 +146,9 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("gmail", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ClientKey(ctx),
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1) }));
+    o.AddPolicy("account", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ClientKey(ctx),
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) }));
     o.AddPolicy("auth", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ClientKey(ctx),
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) }));

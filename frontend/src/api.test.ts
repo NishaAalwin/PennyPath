@@ -18,7 +18,7 @@ describe('getHealth', () => {
 describe('auth api', () => {
   it('login posts credentials as JSON with the CSRF header and returns no token', async () => {
     const f = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ expiresAt: 'x', email: 'a@b.com' }) })
-    const res = await login('a@b.com', 'pw', asFetch(f))
+    const res = await login('a@b.com', 'pw', undefined, asFetch(f))
     expect(res).toEqual({ expiresAt: 'x', email: 'a@b.com' })
     const [url, init] = f.mock.calls[0]
     expect(init.headers['X-Requested-With']).toBe('PennyPath')
@@ -43,7 +43,7 @@ describe('auth api', () => {
         throw new Error('no body')
       },
     })
-    await expect(login('a@b.com', 'x', asFetch(f))).rejects.toThrow(/Too many attempts/)
+    await expect(login('a@b.com', 'x', undefined, asFetch(f))).rejects.toThrow(/Too many attempts/)
   })
 
   it('getMe relies on the session cookie, not a token', async () => {

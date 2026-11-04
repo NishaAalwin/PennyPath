@@ -11,6 +11,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<GmailConnection> GmailConnections => Set<GmailConnection>();
     public DbSet<GmailOAuthState> GmailOAuthStates => Set<GmailOAuthState>();
+    public DbSet<UserToken> UserTokens => Set<UserToken>();
+    public DbSet<RecoveryCode> RecoveryCodes => Set<RecoveryCode>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -37,6 +39,24 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => new { x.UserId, x.At });
             e.HasIndex(x => x.At);
+        });
+
+        b.Entity<UserToken>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Purpose).HasMaxLength(20).IsRequired();
+            e.Property(x => x.TokenHash).HasMaxLength(64).IsRequired();
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.TokenHash).IsUnique();
+            e.HasIndex(x => new { x.UserId, x.Purpose, x.CreatedAt });
+        });
+
+        b.Entity<RecoveryCode>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.CodeHash).HasMaxLength(64).IsRequired();
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.UserId, x.CodeHash });
         });
 
         b.Entity<GmailConnection>(e =>

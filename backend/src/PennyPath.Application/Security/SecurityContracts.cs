@@ -14,6 +14,13 @@ public static class AuditEventTypes
     public const string GmailDisconnected = "GmailDisconnected";
     public const string GmailSynced = "GmailSynced";
     public const string GmailNeedsReconnect = "GmailNeedsReconnect";
+    public const string EmailVerified = "EmailVerified";
+    public const string PasswordResetRequested = "PasswordResetRequested";
+    public const string PasswordReset = "PasswordReset";
+    public const string MfaEnabled = "MfaEnabled";
+    public const string MfaDisabled = "MfaDisabled";
+    public const string DataExported = "DataExported";
+    public const string AccountDeleted = "AccountDeleted";
 }
 
 public record AuditEventDto(Guid Id, string Type, DateTime At, string? Ip);

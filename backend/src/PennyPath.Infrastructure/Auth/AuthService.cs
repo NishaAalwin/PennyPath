@@ -1,14 +1,26 @@
 using System.Net.Mail;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using PennyPath.Application.Account;
 using PennyPath.Application.Auth;
 using PennyPath.Domain.Entities;
 using PennyPath.Infrastructure.Persistence;
 
 namespace PennyPath.Infrastructure.Auth;
 
-public class AuthService(AppDbContext db, ITokenService tokens, TimeProvider clock) : IAuthService
+public class AuthOptions
 {
+    public const string Section = "Auth";
+
+    /// <summary>New accounts must open the emailed link before they can use their data. Turn off only where email cannot be sent.</summary>
+    public bool RequireVerifiedEmail { get; set; } = true;
+}
+
+public class AuthService(AppDbContext db, ITokenService tokens, TimeProvider clock, IMfaVerifier? mfa = null, IOptions<AuthOptions>? options = null) : IAuthService
+{
+    private bool RequireVerifiedEmail => options?.Value.RequireVerifiedEmail ?? true;
+
     public const int MinPasswordLength = 8;
     public const int MaxPasswordLength = 128; // bounds hashing cost so huge inputs cannot be used for DoS
     public const int MaxFailedAttempts = 5;
@@ -37,7 +49,7 @@ public class AuthService(AppDbContext db, ITokenService tokens, TimeProvider clo
         if (await db.Users.AnyAsync(u => u.Email == email, ct))
             return new AuthResult(null, AuthError.EmailTaken, "An account with this email already exists.");
 
-        var user = new User { Email = email };
+        var user = new User { Email = email, EmailVerified = !RequireVerifiedEmail };
         user.PasswordHash = Hasher.HashPassword(user, request.Password);
         db.Users.Add(user);
         try
@@ -74,15 +86,19 @@ public class AuthService(AppDbContext db, ITokenService tokens, TimeProvider clo
 
         var result = Hasher.VerifyHashedPassword(user, user.PasswordHash, password);
         if (result == PasswordVerificationResult.Failed)
+            return invalid with { UserId = await RecordFailureAsync(user, now, ct) };
+
+        // With two-factor on, the password alone is not enough. The failure counter is NOT reset yet, so guessing the
+        // 6-digit code with a known password runs into the same lockout as guessing the password.
+        if (user.MfaEnabled)
         {
-            user.FailedLoginCount++;
-            if (user.FailedLoginCount >= MaxFailedAttempts)
+            if (string.IsNullOrWhiteSpace(request.TotpCode))
+                return new AuthResult(null, AuthError.MfaRequired, "Enter the code from your authenticator app.", user.Id);
+            if (mfa is null || !await mfa.VerifyAsync(user.Id, request.TotpCode, ct))
             {
-                user.LockoutEnd = now + LockoutDuration;
-                user.FailedLoginCount = 0;
+                await RecordFailureAsync(user, now, ct);
+                return new AuthResult(null, AuthError.InvalidCredentials, "That code is not valid.", user.Id);
             }
-            await db.SaveChangesAsync(ct);
-            return invalid with { UserId = user.Id };
         }
 
         user.FailedLoginCount = 0;
@@ -91,6 +107,50 @@ public class AuthService(AppDbContext db, ITokenService tokens, TimeProvider clo
             user.PasswordHash = Hasher.HashPassword(user, password);
         await db.SaveChangesAsync(ct);
         return await SuccessAsync(user, ct);
+    }
+
+    public async Task<ReauthResult> ReauthenticateAsync(Guid userId, string? password, string? code, CancellationToken ct = default)
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user is null) return ReauthResult.Invalid;
+
+        var now = clock.GetUtcNow().UtcDateTime;
+        if (user.LockoutEnd > now) return ReauthResult.LockedOut;
+
+        var pw = password ?? string.Empty;
+        if (pw.Length > MaxPasswordLength) pw = pw[..MaxPasswordLength];
+        if (Hasher.VerifyHashedPassword(user, user.PasswordHash, pw) == PasswordVerificationResult.Failed)
+        {
+            await RecordFailureAsync(user, now, ct);
+            return ReauthResult.Invalid;
+        }
+
+        if (user.MfaEnabled)
+        {
+            if (string.IsNullOrWhiteSpace(code)) return ReauthResult.MfaRequired;
+            if (mfa is null || !await mfa.VerifyAsync(user.Id, code, ct))
+            {
+                await RecordFailureAsync(user, now, ct);
+                return ReauthResult.Invalid;
+            }
+        }
+
+        user.FailedLoginCount = 0;
+        await db.SaveChangesAsync(ct);
+        return ReauthResult.Ok;
+    }
+
+    /// <summary>Counts a failed attempt and locks the account after too many. Returns the user id for the audit log.</summary>
+    private async Task<Guid> RecordFailureAsync(User user, DateTime now, CancellationToken ct)
+    {
+        user.FailedLoginCount++;
+        if (user.FailedLoginCount >= MaxFailedAttempts)
+        {
+            user.LockoutEnd = now + LockoutDuration;
+            user.FailedLoginCount = 0;
+        }
+        await db.SaveChangesAsync(ct);
+        return user.Id;
     }
 
     public async Task<bool> LogoutAsync(Guid userId, Guid sessionId, CancellationToken ct = default)
@@ -111,7 +171,9 @@ public class AuthService(AppDbContext db, ITokenService tokens, TimeProvider clo
         return active.Count;
     }
 
-    private static string? CheckPassword(string? password, string email)
+    public static string HashPassword(User user, string password) => Hasher.HashPassword(user, password);
+
+    public static string? CheckPassword(string? password, string email)
     {
         if (password is null || password.Length < MinPasswordLength)
             return $"Password must be at least {MinPasswordLength} characters.";

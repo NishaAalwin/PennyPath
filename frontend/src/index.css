@@ -175,3 +175,15 @@ button.tab[aria-selected='true'] { background: var(--card); color: var(--accent)
 
 .actions { display: flex; gap: 10px; flex-wrap: wrap; }
 [role='status']:not(.viz-tooltip) { color: var(--ink); background: var(--card-soft); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+
+/* ---- account section ---- */
+.card h3 { margin: 6px 0 0; font-size: 1rem; color: var(--ink); }
+.stack-sm { display: grid; gap: 10px; }
+.codes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.codes li { background: var(--card-soft); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+code { font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: 0.95em; word-break: break-all; }
+code.secret { display: inline-block; background: var(--card-soft); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 1.15rem; letter-spacing: 0.08em; }
+button.danger { background: linear-gradient(135deg, #c62828, #8e1b1b); }
+button.danger:hover:not(:disabled) { background: linear-gradient(135deg, #e04141, #a52424); }
+.farewell { max-width: 440px; margin: 0 auto 16px; }
+label > input[type='text'], label > input[type='password'], label > input:not([type]) { display: block; margin-top: 4px; }

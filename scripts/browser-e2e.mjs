@@ -9,11 +9,42 @@
 // Not wired into CI (needs a browser and the full stack); see docs/operations.md.
 import { tmpdir } from 'node:os'
 import { writeFileSync } from 'node:fs'
+import { createHmac } from 'node:crypto'
 
 const BASE = 'https://localhost:8443/'
+const MAILPIT = 'http://127.0.0.1:8025' // the local mail catcher that receives the app's emails
 const SP = process.argv[2] ?? tmpdir()
 const EMAIL = `e2e${Date.now()}@example.com`
 const PASSWORD = 'Sup3r-Secret-Pass!9x'
+const NEW_PASSWORD = 'An0ther-Long-Passphrase!7'
+
+/** The newest email sent to this address that holds a #verify= or #reset= link; returns the token from the link. */
+async function emailedToken(to, kind) {
+  for (let i = 0; i < 60; i++) {
+    const found = await (await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent('to:' + to)}`)).json()
+    for (const m of found.messages ?? []) {
+      const full = await (await fetch(`${MAILPIT}/api/v1/message/${m.ID}`)).json()
+      const hit = new RegExp(`#${kind}=([A-Za-z0-9_-]+)`).exec(full.Text ?? '')
+      if (hit) return hit[1]
+    }
+    await new Promise((r) => setTimeout(r, 250))
+  }
+  throw new Error(`no ${kind} email arrived for ${to}`)
+}
+
+/** What an authenticator app would show: RFC 6238 (SHA-1, 6 digits, 30 s), for a base32 secret. */
+function totp(base32, stepOffset = 0) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  let bits = ''
+  for (const c of base32.replace(/\s+/g, '').toUpperCase()) bits += alphabet.indexOf(c).toString(2).padStart(5, '0')
+  const key = Buffer.from(bits.match(/.{8}/g).map((b) => parseInt(b, 2)))
+  const counter = Buffer.alloc(8)
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000) + stepOffset))
+  const h = createHmac('sha1', key).update(counter).digest()
+  const o = h[h.length - 1] & 15
+  const n = ((h[o] & 0x7f) << 24) | (h[o + 1] << 16) | (h[o + 2] << 8) | h[o + 3]
+  return String(n % 1_000_000).padStart(6, '0')
+}
 
 const targets = await (await fetch('http://127.0.0.1:9333/json')).json()
 const page = targets.find((t) => t.type === 'page')
@@ -91,8 +122,32 @@ await ev(`__btn('Need an account? Sign up').click()`)
 await waitFor(`__btn('Sign up')`, 'sign-up form')
 await ev(`__setValue(document.querySelector('input[type=email]'), ${JSON.stringify(EMAIL)}); __setValue(document.querySelector('input[type=password]'), ${JSON.stringify(PASSWORD)});`)
 await ev(`__btn('Sign up').click()`)
+await waitFor(`__text().includes('Confirm your email')`, 'verify screen')
+check('A new account is held at "Confirm your email": no transactions, no data tabs until the link is opened',
+  await ev(`!document.querySelector('[role=tab]') && !__text().includes('Import SMS')`))
+
+// open the emailed link in a fresh page load, as clicking it in a mail client would
+const verifyToken = await emailedToken(EMAIL, 'verify')
+await send('Page.navigate', { url: `${BASE}?opened=1#verify=${verifyToken}` })
+await sleep(500)
+await install()
+await waitFor(`__text().includes('Your email is confirmed')`, 'email confirmed')
+check('The emailed verify link confirms the address, and the token is gone from the address bar',
+  await ev(`location.hash === '' && !location.href.includes(${JSON.stringify(verifyToken)})`), await ev('location.href'))
+await ev(`__btn('Continue').click()`)
 await waitFor(`__text().includes('Signed in as')`, 'signed in')
-check('Sign-up through the real form signs the user in', await ev(`__text().includes(${JSON.stringify(EMAIL)})`))
+check('After verifying, the same session opens the app', await ev(`__text().includes(${JSON.stringify(EMAIL)}) && Boolean(document.querySelector('[role=tab]'))`))
+
+// the same link cannot be used twice
+await send('Page.navigate', { url: `${BASE}?again=1#verify=${verifyToken}` })
+await sleep(500)
+await install()
+await waitFor(`document.querySelector('[role=alert]')`, 'second use refused')
+check('The verify link works only once', await ev(`document.querySelector('[role=alert]').textContent.includes('invalid or has expired')`))
+await send('Page.navigate', { url: BASE })
+await sleep(500)
+await install()
+await waitFor(`__text().includes('Signed in as')`, 'back in the app')
 
 // ---------------------------------------------------------------- where is the token?
 const cookies = (await send('Network.getAllCookies')).cookies.filter((c) => c.name.includes('pp_session'))
@@ -280,6 +335,111 @@ await ev(`__btn('Log in').click()`)
 await waitFor(`document.querySelector('[role=alert]')`, 'error shown')
 check('A wrong password shows "Invalid email or password."', await ev(`document.querySelector('[role=alert]').textContent === 'Invalid email or password.'`))
 
+// ---------------------------------------------------------------- forgot password, through the emailed link
+const setPasswords = (a, b) => ev(`(() => { const p = document.querySelectorAll('input[type=password]'); __setValue(p[0], ${JSON.stringify(a)}); __setValue(p[1], ${JSON.stringify(b)}); })()`)
+const forgot = async (address) => {
+  await ev(`__btn('Forgot your password?').click()`)
+  await waitFor(`__text().includes('Reset your password')`, 'forgot form')
+  await ev(`__setValue(document.querySelector('input[type=email]'), ${JSON.stringify(address)})`)
+  await ev(`__btn('Send the link').click()`)
+  await waitFor(`__text().includes('reset link is on its way')`, 'reset requested')
+  return ev(`document.querySelector('[role=status]').textContent`)
+}
+const unknownAnswer = await forgot('nobody-here@example.com')
+await ev(`__btn('Back to log in').click()`)
+const knownAnswer = await forgot(EMAIL)
+check('Forgot password gives the same answer for an unknown address and a real one', unknownAnswer === knownAnswer, `"${knownAnswer}"`)
+
+const resetToken = await emailedToken(EMAIL, 'reset')
+await send('Page.navigate', { url: `${BASE}?reset=1#reset=${resetToken}` })
+await sleep(500)
+await install()
+await waitFor(`__text().includes('Choose a new password')`, 'reset form')
+check('The reset token is removed from the address bar', await ev(`location.hash === '' && !location.href.includes(${JSON.stringify(resetToken)})`))
+await setPasswords(NEW_PASSWORD, 'does-not-match-1')
+await ev(`__btn('Change password').click()`)
+await waitFor(`document.querySelector('[role=alert]')`, 'mismatch message')
+check('Two different passwords are refused before anything is sent', await ev(`document.querySelector('[role=alert]').textContent.includes('do not match')`))
+await setPasswords(NEW_PASSWORD, NEW_PASSWORD)
+await ev(`__btn('Change password').click()`)
+await waitFor(`__text().includes('Password changed')`, 'password changed')
+check('The reset changes the password and says every device was signed out', await ev(`__text().includes('every device was signed out')`))
+await ev(`__btn('Go to log in').click()`)
+await waitFor(`document.querySelector('input[type=email]')`, 'login form after reset')
+
+await ev(`__setValue(document.querySelector('input[type=email]'), ${JSON.stringify(EMAIL)}); __setValue(document.querySelector('input[type=password]'), ${JSON.stringify(PASSWORD)});`)
+await ev(`__btn('Log in').click()`)
+await waitFor(`document.querySelector('[role=alert]')`, 'old password refused')
+check('The old password no longer works after a reset', await ev(`document.querySelector('[role=alert]').textContent === 'Invalid email or password.'`))
+await ev(`__setValue(document.querySelector('input[type=password]'), ${JSON.stringify(NEW_PASSWORD)})`)
+await ev(`__btn('Log in').click()`)
+await waitFor(`__text().includes('Signed in as')`, 'signed in with the new password')
+check('The new password works', true)
+
+const usedAgain = await ev(`fetch('/api/auth/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'PennyPath' }, body: JSON.stringify({ token: ${JSON.stringify(resetToken)}, newPassword: 'Yet-Another-Passphrase-3' }) }).then((r) => r.status)`)
+check('The reset link cannot be used a second time', usedAgain === 400, String(usedAgain))
+
+// ---------------------------------------------------------------- two-factor login
+await ev(`__tab('Privacy and security')`)
+await waitFor(`__btn('Set up two-factor login')`, 'account section')
+await ev(`__btn('Set up two-factor login').click()`)
+await waitFor(`document.querySelector('code.secret')`, 'setup key')
+const secret = (await ev(`document.querySelector('code.secret').textContent`)).replace(/\s+/g, '')
+check('Setup shows a 32-character key to type into an authenticator app', /^[A-Z2-7]{32}$/.test(secret), secret.replace(/./g, '*'))
+await ev(`__setValue(document.querySelector('input[autocomplete=one-time-code]'), '000000')`)
+await ev(`__btn('Turn on').click()`)
+await waitFor(`document.querySelector('[role=alert]')`, 'wrong setup code refused')
+check('A wrong code does not turn two-factor on', await ev(`document.querySelector('[role=alert]').textContent.includes('not right')`))
+await ev(`__setValue(document.querySelector('input[autocomplete=one-time-code]'), ${JSON.stringify(totp(secret))})`)
+await ev(`__btn('Turn on').click()`)
+await waitFor(`document.querySelector('ul.codes')`, 'recovery codes')
+const recovery = await ev(`[...document.querySelectorAll('ul.codes code')].map((c) => c.textContent)`)
+check('The right code turns it on and shows 10 one-time recovery codes', recovery.length === 10 && recovery.every((c) => /^[a-hj-km-np-z2-9]{5}-[a-hj-km-np-z2-9]{5}$/.test(c)), `${recovery.length} codes`)
+await ev(`__btn('I have saved them').click()`)
+await waitFor(`__text().includes('Turn off two-factor login')`, 'two-factor on')
+
+// the data export
+await ev(`__btn('Download my data').click()`)
+await waitFor(`__text().includes('pennypath-export.json')`, 'download notice')
+const exported = await ev(`fetch('/api/account/export').then((r) => r.text())`)
+check('The export holds the account email and transactions but no password hash or secret',
+  exported.includes(EMAIL) && exported.includes('"transactions"') && !/passwordHash|protectedMfaSecret|tokenHash|recoveryCode|AQAAAA/i.test(exported))
+
+// signing in now needs the code
+await ev(`__btn('Log out').click()`)
+await waitFor(`document.querySelector('input[type=email]')`, 'login form')
+await ev(`__setValue(document.querySelector('input[type=email]'), ${JSON.stringify(EMAIL)}); __setValue(document.querySelector('input[type=password]'), ${JSON.stringify(NEW_PASSWORD)});`)
+await ev(`__btn('Log in').click()`)
+await waitFor(`__text().includes('Verification code')`, 'asks for the code')
+check('With two-factor on, the password alone does not sign in: the page asks for a code', await ev(`!__text().includes('Signed in as')`))
+await ev(`__setValue(document.querySelector('input[autocomplete=one-time-code]'), '000000')`)
+await ev(`__btn('Verify and log in').click()`)
+await waitFor(`document.querySelector('[role=alert]')`, 'wrong code refused')
+check('A wrong code is refused', await ev(`document.querySelector('[role=alert]').textContent === 'That code is not valid.'`))
+await ev(`__setValue(document.querySelector('input[autocomplete=one-time-code]'), ${JSON.stringify(totp(secret, 1))})`)
+await ev(`__btn('Verify and log in').click()`)
+await waitFor(`__text().includes('Signed in as')`, 'signed in with a code')
+check('Password plus the authenticator code signs in', true)
+
+// ---------------------------------------------------------------- delete the account (with a recovery code as the second factor)
+await ev(`__tab('Privacy and security')`)
+await waitFor(`[...document.querySelectorAll('details')].some((d) => d.textContent.includes('Delete my account and all my data'))`, 'delete section')
+await ev(`(() => { const d = [...document.querySelectorAll('details')].find((x) => x.textContent.includes('Delete my account and all my data')); d.querySelector('summary').click(); })()`)
+await ev(`(() => { const d = [...document.querySelectorAll('details')].find((x) => x.textContent.includes('Delete my account and all my data')); __setValue(d.querySelector('input[type=password]'), 'wrong-password-1'); __setValue(d.querySelector('input[autocomplete=one-time-code]'), ${JSON.stringify(recovery[0])}); d.querySelector('input[type=checkbox]').click(); })()`)
+await waitFor(`!__btn('Delete everything').disabled`, 'confirm box ticked')
+await ev(`__btn('Delete everything').click()`)
+await waitFor(`document.querySelector('[role=alert]')`, 'wrong password refused')
+check('Deleting with a wrong password is refused and nothing is deleted', await ev(`document.querySelector('[role=alert]').textContent.includes('not right') && __text().includes('Signed in as')`))
+await ev(`(() => { const d = [...document.querySelectorAll('details')].find((x) => x.textContent.includes('Delete my account and all my data')); __setValue(d.querySelector('input[type=password]'), ${JSON.stringify(NEW_PASSWORD)}); __setValue(d.querySelector('input[autocomplete=one-time-code]'), ${JSON.stringify(recovery[0])}); })()`)
+await ev(`__btn('Delete everything').click()`)
+await waitFor(`__text().includes('Your account and all its data were deleted')`, 'account deleted')
+check('With the password and a code, the account is deleted and the page returns to the log-in form', await ev(`Boolean(document.querySelector('input[type=email]')) && !__text().includes('Signed in as')`))
+await ev(`__setValue(document.querySelector('input[type=email]'), ${JSON.stringify(EMAIL)}); __setValue(document.querySelector('input[type=password]'), ${JSON.stringify(NEW_PASSWORD)});`)
+await ev(`__btn('Log in').click()`)
+await waitFor(`document.querySelector('[role=alert]')`, 'deleted account cannot sign in')
+check('The deleted account can no longer sign in', await ev(`document.querySelector('[role=alert]').textContent === 'Invalid email or password.'`))
+console.log(`DELETED_ACCOUNT=${EMAIL}`)
+
 // ---------------------------------------------------------------- everything the browser complained about
 const problems = []
 for (const m of events) {
@@ -295,7 +455,8 @@ for (const p of problems) console.log(' ' + p.slice(0, 220))
 // replayed from earlier runs of this page, so counting would be misleading; classifying each line is not.
 const expected = [
   /status of 401 .*\/api\/auth\/(me|login)/,
-  /status of 400 .*\/api\/transactions\//,
+  /status of 400 .*\/api\/(transactions\/|auth\/(verify-email|reset-password)|account\/mfa\/enable)/,
+  /status of 403 .*\/api\/account\/delete/,
   /Executing inline script violates/,
   /Connecting to 'https:\/\/example\.com\/' violates/,
   /Fetch API cannot load https:\/\/example\.com/,
