@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using PennyPath.Application.Categorization;
+using PennyPath.Application.Gmail;
 using PennyPath.Application.Parsing;
 using PennyPath.Application.Reconciliation;
 using PennyPath.Application.Summary;
@@ -52,6 +53,53 @@ public partial class TransactionService(AppDbContext db, ITransactionParser pars
             });
         }
 
+        var fresh = await SaveNewAsync(userId, candidates, ct);
+
+        var duplicates = messages.Count(m => !string.IsNullOrWhiteSpace(m)) - unparsed.Count - fresh.Count;
+        return new ImportResult(fresh.Count, duplicates, unparsed, fresh.Count(t => t.DuplicateOfId is not null));
+    }
+
+    /// <summary>The key that makes a Gmail sync repeatable: derived from the message id, so no email text is needed to recognise it.</summary>
+    public static string EmailKey(string messageId) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("gmail:" + messageId)));
+
+    public async Task<EmailImportResult> ImportEmailsAsync(Guid userId, IReadOnlyList<EmailItem> items, CancellationToken ct = default)
+    {
+        var unrecognised = new List<string>();
+        var candidates = new Dictionary<string, Transaction>();
+
+        foreach (var item in items.Take(MaxMessages))
+        {
+            var parsed = parser.Parse(EmailTextExtractor.BuildParsableText(item.Subject, item.Body), item.ReceivedOn);
+            if (parsed is null)
+            {
+                var subject = Whitespace().Replace(item.Subject ?? string.Empty, " ").Trim();
+                unrecognised.Add(subject.Length == 0 ? "(no subject)" : subject.Length > 80 ? subject[..80] + "..." : subject);
+                continue;
+            }
+
+            var key = EmailKey(item.Id);
+            candidates.TryAdd(key, new Transaction
+            {
+                UserId = userId,
+                Date = parsed.Date,
+                Amount = parsed.Amount,
+                Type = parsed.Type,
+                Merchant = parsed.Merchant ?? string.Empty,
+                Category = categorizer.Categorize(parsed.Merchant, parsed.Type),
+                IsRefund = parsed.IsRefund,
+                Source = TransactionSource.Email,
+                RawHash = key,
+            });
+        }
+
+        var fresh = await SaveNewAsync(userId, candidates, ct);
+        return new EmailImportResult(fresh.Count, candidates.Count - fresh.Count, fresh.Count(t => t.DuplicateOfId is not null), unrecognised);
+    }
+
+    /// <summary>Saves the candidates that are not already stored (by key), flagging duplicates, refunds and the like.</summary>
+    private async Task<List<Transaction>> SaveNewAsync(Guid userId, Dictionary<string, Transaction> candidates, CancellationToken ct)
+    {
         var hashes = candidates.Keys.ToList();
         var existing = await db.Transactions
             .Where(t => t.UserId == userId && hashes.Contains(t.RawHash))
@@ -62,9 +110,7 @@ public partial class TransactionService(AppDbContext db, ITransactionParser pars
         db.Transactions.AddRange(fresh);
 
         await db.SaveChangesAsync(ct);
-
-        var duplicates = messages.Count(m => !string.IsNullOrWhiteSpace(m)) - unparsed.Count - fresh.Count;
-        return new ImportResult(fresh.Count, duplicates, unparsed, fresh.Count(t => t.DuplicateOfId is not null));
+        return fresh;
     }
 
     /// <summary>The user's stored rows that a new batch could duplicate, refund or pair with.</summary>

@@ -68,3 +68,29 @@ In the repository settings, turn on:
 ## 7. Browser end-to-end check
 
 `scripts/browser-e2e.mjs` drives the real app in Edge or Chrome (DevTools protocol, no extra packages) and checks 43 things: sign-up, cookie flags, nothing in `localStorage`, import, summary numbers, charts with hover and keyboard, search, filters, edit (valid and invalid), category change, "Not a duplicate", "Mark as transfer", paging, the privacy panel, CSP probes, logout, replay of the old session and every browser console error. Usage is in the script header. It needs the full stack running and is not part of CI. Last run 2026-11-03: 43 of 43 passed, three runs in a row.
+
+## 8. Connect Gmail (M2)
+
+The Gmail import is off until you give the server a Google OAuth client. Nothing in the repository contains one.
+
+**Create the client (once, in Google Cloud Console)**
+1. Create a project and enable the **Gmail API**.
+2. **OAuth consent screen:** user type **External**, publishing status **Testing**. Under *Test users* add your own Gmail address. In Testing mode Google lets only listed test users connect (up to 100) and expires the grant after **7 days**, so you reconnect weekly; the app tells you when that happens.
+3. **Credentials, Create credentials, OAuth client ID:** type **Web application**. Add the authorised redirect URI **exactly**: `https://localhost:8443/api/gmail/callback` (for a real domain use `https://your-domain/api/gmail/callback` and set `GOOGLE_REDIRECT_URI` to the same).
+4. Put the values in your local `.env` (git-ignored), never in chat, code or the vault:
+   ```
+   GOOGLE_CLIENT_ID=...apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=...
+   ```
+5. `docker compose up -d api` to pick them up. In the app, open **Transactions** and choose **Connect Gmail**. Google shows a "this app isn't verified" warning for test apps: choose Advanced, then continue, since it is your own app.
+
+**What the app does**
+- Asks only for `gmail.readonly` (it cannot send, delete or change mail). A grant with any other scope is refused and revoked.
+- Searches only emails from a fixed list of bank and payment-app domains (`GmailQuery.SenderDomains`) that contain alert words (debited, credited, spent, UPI, ...), and `-in:spam -in:trash`. First sync: last 90 days. Later syncs: since the previous sync (one day of overlap). At most 300 emails per sync; the page says when more are waiting.
+- Reads each email in memory, extracts amount, where, date and in or out, and drops it. The email text, sender and ids are not stored. The repeat-proof key is a SHA-256 of the Gmail message id.
+- Stores only the **refresh token, encrypted** with the Data Protection key ring (`dpkeys` volume). Losing the key ring makes the saved token unreadable; the user then reconnects. Back the key ring up as described in section 4.
+- **Disconnect** deletes the stored token and revokes the grant at Google. Transactions already imported stay.
+
+**If your bank is not in the list or an alert is not recognised:** the sync result lists the subjects of emails it could not read (shown once, not stored). Send the subject wording (no account numbers) and the sender domain and the list or parser can be extended.
+
+**Not verified against real Google yet.** The flow is tested against a stand-in for Google; the first real connection is the real test.

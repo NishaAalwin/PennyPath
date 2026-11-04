@@ -30,6 +30,10 @@ services:
       ForwardedHeaders__KnownProxies__0: 172.28.0.10
       # Key ring for encrypting stored secrets. It lives on a volume so it survives restarts and rebuilds.
       DataProtection__KeysPath: /var/dpkeys
+      # Gmail import. Leave empty to keep the feature off. Create the OAuth client as described in docs/operations.md.
+      Google__ClientId: ${GOOGLE_CLIENT_ID:-}
+      Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
+      Google__RedirectUri: ${GOOGLE_REDIRECT_URI:-https://localhost:8443/api/gmail/callback}
     volumes:
       - dpkeys:/var/dpkeys
     depends_on:

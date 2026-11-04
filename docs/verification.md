@@ -180,3 +180,26 @@ User decision: read and keep only amount, where/what (merchant), date and debit/
 - Browser checks ran in headless Edge only (no Firefox or Safari; SameSite=Strict and `__Host-` cookies behave the same in current Chrome-family browsers, unchecked elsewhere).
 - Whole page has a blue-gradient light/dark theme (2026-11-04); text contrast was checked by eye in screenshots, not measured.
 - The app moved to https://localhost:8443; the old ports no longer answer.
+
+## M2 Gmail import (2026-11-04)
+| Check | Result | Evidence |
+|---|---|---|
+| Backend tests | **Verified** | 255 pass (62 new): service flow with a fake Google, HTTP layer against a stub handler, endpoints over the real API |
+| Frontend | **Verified** | 39 tests, lint, build, audit clean |
+| Migration on real Postgres | **Verified** | `AddGmailConnection` applied; `GmailConnections` unique per user, FK cascade, token column is text holding ciphertext |
+| Not configured | **Verified live** | status `configured:false`, connect/sync 409 with a clear message, UI explains |
+| Consent address | **Verified live** (dummy client id) | scope `gmail.readonly` only, PKCE S256, offline access, state stored as a hash, no secret in the URL |
+| Forged callback / no login / no CSRF header | **Verified live** | 302 to `?gmail=failed`, 401, 403 |
+| Browser | **Verified** | 47/47 including the Gmail card |
+| Single-use state, expiry, wrong user, extra scope, no refresh token, revoked grant, lost key ring, outage, concurrent sync, disconnect | **Verified (unit)** | `GmailServiceTests` |
+| Idempotent sync | **Verified (unit)** | second sync reads nothing and adds nothing; known emails are not read again |
+| Cross-source duplicate | **Verified (unit)** | SMS then email of the same payment is flagged as a possible duplicate |
+| Email footers ("never share your OTP") | **Verified (unit)** | the cut keeps real alerts; a real OTP message is still ignored |
+| **Real Google round trip** | **Not verified** | needs your OAuth client; nothing has talked to the real Google yet |
+| **Real bank email formats** | **Not verified** | parser tested on formats I wrote from memory; accuracy on your real emails is unmeasured |
+
+### Known limitations
+- Testing mode: the grant expires after 7 days; reconnect.
+- The sender list is by domain and may miss your bank; extend `GmailQuery.SenderDomains`.
+- A transaction you delete can come back if its email is inside the one-day overlap of the next sync.
+- Emails that look like alerts but cannot be read are re-read on every sync (they are not remembered).

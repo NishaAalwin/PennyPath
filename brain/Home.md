@@ -16,7 +16,7 @@ Every task is checked against this vault before it is called done. See [[Task Pr
 | Item | Status |
 |---|---|
 | M1 | done, API verified, browser UI untested |
-| M2 | not started (needs Google OAuth client from user) |
+| M2 | built, not verified against real Google: OAuth+PKCE, encrypted token, sync, disconnect, UI, 62 new tests; needs your OAuth client for the first real connection |
 | M3 | done, accuracy on real messages unmeasured |
 | M4 | done (paste import) |
 | M5 | rules + user correction done; AI fallback deferred; accuracy unmeasured |

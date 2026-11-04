@@ -114,6 +114,8 @@ const SMS = [
   'Hello, your parcel is out for delivery',
 ].join('\n\n')
 await ev(`__tab('Transactions')`)
+await waitFor(`!__text().includes('Checking...')`, 'gmail status loaded')
+check('Gmail card is shown in the Transactions tab and says it is not set up (no Google client configured)', await ev(`__text().includes('Gmail import is not set up on this server yet') && !__btn('Connect Gmail')`))
 await ev(`__setValue(document.querySelector('textarea'), ${JSON.stringify(SMS)})`)
 await ev(`__btn('Import').click()`)
 await waitFor(`__text().includes('Imported 5')`, 'import result')

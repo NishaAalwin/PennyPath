@@ -7,6 +7,9 @@ public record SmsImportRequest(IReadOnlyList<string> Messages);
 
 public record ImportResult(int Imported, int Duplicates, IReadOnlyList<string> Unparsed, int PossibleDuplicates = 0);
 
+/// <param name="NotRecognisedSubjects">Shortened subjects of emails that could not be read; shown once, never stored.</param>
+public record EmailImportResult(int Imported, int Duplicates, int PossibleDuplicates, IReadOnlyList<string> NotRecognisedSubjects);
+
 public record TransactionDto(
     Guid Id, DateOnly Date, decimal Amount, TransactionType Type,
     string Merchant, string Category, TransactionSource Source,
@@ -48,6 +51,9 @@ public interface ITransactionService
     Task<CategoryUpdateResult> UpdateCategoryAsync(Guid userId, Guid transactionId, string? category, CancellationToken ct = default);
 
     Task<ImportResult> ImportSmsAsync(Guid userId, IReadOnlyList<string> messages, CancellationToken ct = default);
+
+    /// <summary>Parses and saves alert emails. The message id (not the text) is the repeat-proof key; no email text is stored.</summary>
+    Task<EmailImportResult> ImportEmailsAsync(Guid userId, IReadOnlyList<Gmail.EmailItem> items, CancellationToken ct = default);
 
     /// <summary>Income, expense, savings and totals by place and category for one month (default: current month).</summary>
     Task<MonthlySummary> SummaryAsync(Guid userId, string? month, CancellationToken ct = default);

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import GmailPanel from './GmailPanel'
+import { readGmailReturn } from './gmail'
 import SummaryPanel from './SummaryPanel'
 import Tabs from './Tabs'
 import TrendChart from './TrendChart'
@@ -10,7 +12,7 @@ import {
 type Props = { onSessionExpired: () => void; privacy: ReactNode }
 
 export default function Transactions({ onSessionExpired, privacy }: Props) {
-  const [tab, setTab] = useState('summary')
+  const [tab, setTab] = useState(() => (readGmailReturn(window.location.search) ? 'transactions' : 'summary'))
   const [text, setText] = useState('')
   const [version, setVersion] = useState(0)
   const [result, setResult] = useState<ImportResult | null>(null)
@@ -73,6 +75,7 @@ export default function Transactions({ onSessionExpired, privacy }: Props) {
       label: 'Transactions',
       content: (
         <div className="stack">
+          <GmailPanel onSessionExpired={onSessionExpired} onImported={() => { setVersion((v) => v + 1); refresh() }} />
           <section className="card">
             <h2>Import SMS</h2>
             <p className="muted">Paste your bank SMS messages here, with a blank line between messages. Only the amount, where it was spent, the date and whether it was money in or out are saved. The message text is not stored.</p>

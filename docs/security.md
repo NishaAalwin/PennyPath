@@ -72,3 +72,12 @@ Only amount, merchant (where/what), date and debit/credit are stored. Account nu
 - **Backups:** `scripts/backup.sh` / `restore.sh` (AES-256, PBKDF2) cover the database and the key ring; restore never overwrites the live database. A restore matched live exactly.
 - **Dependency finding fixed during this work:** the first Data Protection package version I added (10.0.4) carried a critical advisory (GHSA-9mv3-2cwr-p262, fixed in 10.0.7) and a transitive high one in System.Security.Cryptography.Pkcs (fixed in 10.0.13); it was moved to 10.0.14 and the scan is clean.
 - **Breaking change:** the web app no longer works at the old addresses (`:8080`, `:5000`); use `https://localhost:8443`. Login responses no longer contain a token.
+
+## Update 2026-11-04: Gmail import (M2)
+- **Scope:** `gmail.readonly` only; any other scope in Google's answer is refused and the grant revoked.
+- **OAuth flow:** authorization code with **PKCE (S256)** and a random single-use `state` (32 bytes; only its SHA-256 is stored; expires in 10 minutes; one pending request per user). The callback is anonymous because the SameSite=Strict login cookie is not sent on Google's cross-site redirect; the user is identified by the state they started, so a forged or replayed callback attaches nothing. The redirect after the callback is a fixed local path.
+- **Secrets:** the client secret lives only in the environment (`GOOGLE_CLIENT_SECRET`) and travels only in POST bodies to Google. The refresh token is encrypted with `ITokenProtector` before storage and is never returned by any endpoint, logged, or put in a URL. Access tokens are held in memory for one sync.
+- **Data minimisation:** only bank-like emails are searched; bodies are cut at disclaimers, parsed in memory and dropped; the stored key is a hash of the message id, so no email text is needed to stay repeat-proof.
+- **Abuse limits:** one sync at a time per user, 300 emails per sync, 20 KB per body, 30 s HTTP timeout, a 30 requests/minute limit on the Gmail endpoints, CSRF header required on connect/sync/disconnect.
+- **Audit:** connect, disconnect, sync and "reconnect needed" are logged (type and time only).
+- **Not done:** not tested against the real Google service; the Google "restricted scope" verification needed to open this to other users is not started (test-user mode only); an email that spoofs a bank sender could add a fake transaction to its owner's own account (the sender list is by domain, with no SPF/DKIM check); no alert when Google revokes access besides the in-app prompt.

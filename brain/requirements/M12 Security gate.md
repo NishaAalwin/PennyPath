@@ -15,7 +15,7 @@ verified: 193 backend + 32 frontend tests; live over HTTPS on the compose stack;
 - [x] **Token revocation.** Server-side `Sessions`; logout and "sign out of all devices"; expired/unknown sessions rejected; replay of a copied cookie → 401 after logout (verified live)
 - [ ] **Refresh strategy** — none by design: fixed 60-minute sessions, sign in again. No rotation or reuse detection. Documented
 - [x] **Data Protection key ring persisted; encryption service for stored secrets.** `ITokenProtector` over ASP.NET Data Protection; key ring on the `dpkeys` volume (writable by the non-root user; the app already created a real key there); round trip, tamper, wrong purpose, restart and lost-key tests
-- [ ] **Gmail refresh tokens actually encrypted with it** — no Gmail code yet; [[M2 Gmail import]] must use `ITokenProtector` and nothing else for token storage
+- [x] **Gmail refresh tokens actually encrypted with it** — done in [[M2 Gmail import]] (2026-11-04): only `ITokenProtector`, ciphertext verified in tests
 - [x] **AI consent screen and opt-out.** Off by default; `GET/PUT /api/privacy/ai`; UI checkbox with plain-language text; audit trail; `IAiConsent` is the gate
 - [ ] **Data minimisation enforced in code for AI** — no AI feature exists, so nothing to enforce yet; the gate only works if each future AI feature calls it ([[M5 Categorization]] AI fallback must check `IAiConsent` and send merchant text only)
 - [x] **Backups plan, tested.** `scripts/backup.sh` / `restore.sh` (AES-256 + PBKDF2) for the database and the key ring; restore into a scratch DB matched live exactly; wrong passphrase / live name / odd name refused; no plaintext in the encrypted files

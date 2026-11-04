@@ -30,7 +30,7 @@ Only amount, merchant, date, debit/credit, category/flags and a SHA-256 of the m
 4. No refresh tokens (fixed 60-minute sessions; no rotation or reuse detection)
 5. No email verification, password reset or MFA ([[M10 Account lifecycle]])
 6. No DB encryption at rest (use host disk/volume encryption); Data Protection key files unencrypted at rest; backups not scheduled or copied off-machine
-7. Gmail tokens must be stored with `ITokenProtector` when [[M2 Gmail import]] is built
+7. Gmail tokens are stored with `ITokenProtector` (done 2026-11-04); a real Google connection and sender spoofing (no SPF/DKIM check) remain open, see [[M2 Gmail import]]
 8. Audit log exists; no alerting or monitoring
 9. Docker images not scanned; not penetration tested (browser check was functional, not a pen test)
 10. Account deletion and data export not implemented ([[M10 Account lifecycle]]); AI features not built (gate exists)

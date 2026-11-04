@@ -65,3 +65,11 @@ Newest first. One entry per task: date · task · notes checked · result · gap
 - Change: Summary, Income and spending by month, Transactions (import above the list) and Privacy and security are separate tabs (`Tabs.tsx`); the month picker moved above the tabs and drives summary, chart and list. No API, data or dependency change.
 - Evidence: 32 frontend tests, lint, build; web image rebuilt; `scripts/browser-e2e.mjs` 46/46 (tab existence, single visible panel, arrow-key navigation added; steps now switch tabs); screenshots of each tab and at 390 px viewed.
 - Gaps: selected tab is not remembered after reload; Safari/Firefox/mobile devices not viewed.
+
+## 2026-11-04 · M2 Gmail import
+- Notes checked before coding: [[M2 Gmail import]], [[Data minimisation]], [[M12 Security gate]], [[Security checklist]], [[Non-functional requirements]].
+- Built: Google OAuth (read-only scope, PKCE, single-use hashed state), encrypted refresh token via `ITokenProtector`, bank-email search, in-memory parsing with footer cut, repeat-proof sync keyed on a hash of the message id, disconnect with revoke, audit events, rate limit, UI card, migration `AddGmailConnection`.
+- Evidence: 255 backend tests (62 new), 39 frontend tests, lint/build/audit clean; migration and endpoints live on compose Postgres; consent address inspected with a dummy client id (scope, PKCE, no secret in URL); forged callback → `?gmail=failed`, no login → 401, no header → 403; browser 47/47.
+- Security walk: every endpoint but the Google return address has `[Authorize]` and user-scoped queries; cross-user tests; no token or secret in any response, log or URL; CSRF header; no new package; docs/security.md updated with what is not done.
+- NOT verified: a real Google connection (needs the user's OAuth client), real bank email formats and accuracy. Marked "built, not verified against real Google".
+- Open: sender list by domain; no SPF/DKIM check; Testing-mode 7-day expiry; Google restricted-scope verification not started; unreadable emails re-read each sync.

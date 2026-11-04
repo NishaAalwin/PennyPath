@@ -9,6 +9,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<GmailConnection> GmailConnections => Set<GmailConnection>();
+    public DbSet<GmailOAuthState> GmailOAuthStates => Set<GmailOAuthState>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -35,6 +37,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => new { x.UserId, x.At });
             e.HasIndex(x => x.At);
+        });
+
+        b.Entity<GmailConnection>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.ProtectedRefreshToken).IsRequired();
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.UserId).IsUnique(); // one Gmail account per user
+        });
+
+        b.Entity<GmailOAuthState>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.StateHash).HasMaxLength(64).IsRequired();
+            e.Property(x => x.ProtectedCodeVerifier).IsRequired();
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.StateHash).IsUnique();
         });
 
         b.Entity<Transaction>(e =>

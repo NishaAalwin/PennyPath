@@ -10,6 +10,10 @@ public static class AuditEventTypes
     public const string LoggedOutEverywhere = "LoggedOutEverywhere";
     public const string AiConsentGranted = "AiConsentGranted";
     public const string AiConsentRevoked = "AiConsentRevoked";
+    public const string GmailConnected = "GmailConnected";
+    public const string GmailDisconnected = "GmailDisconnected";
+    public const string GmailSynced = "GmailSynced";
+    public const string GmailNeedsReconnect = "GmailNeedsReconnect";
 }
 
 public record AuditEventDto(Guid Id, string Type, DateTime At, string? Ip);

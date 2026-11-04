@@ -19,6 +19,7 @@ All ports bind to 127.0.0.1 only; the API and web containers are reachable only 
 
 ## Configuration
 - `JWT_KEY` and `POSTGRES_PASSWORD` (in `.env`): required, there are no default secrets. `JWT_KEY` must be at least 32 bytes.
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, optional `GOOGLE_REDIRECT_URI` (in `.env`): turn on the Gmail import. Off when empty. Setup steps: [docs/operations.md](docs/operations.md) section 8.
 
 ## Run locally
 ```

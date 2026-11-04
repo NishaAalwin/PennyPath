@@ -55,7 +55,7 @@ export function splitMessages(text: string): string[] {
 }
 
 /** Calls the API with the session cookie (sent by the browser; scripts cannot read it) and the app's CSRF header. */
-async function authed<T>(path: string, init: RequestInit, fetchFn: Fetch): Promise<T> {
+export async function authed<T>(path: string, init: RequestInit, fetchFn: Fetch): Promise<T> {
   const res = await fetchFn(`${API_URL}${path}`, {
     ...init,
     credentials: 'same-origin',

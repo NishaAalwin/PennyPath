@@ -11,10 +11,12 @@ using Microsoft.IdentityModel.Tokens;
 using PennyPath.Api.Security;
 using PennyPath.Application.Auth;
 using PennyPath.Application.Categorization;
+using PennyPath.Application.Gmail;
 using PennyPath.Application.Parsing;
 using PennyPath.Application.Security;
 using PennyPath.Application.Transactions;
 using PennyPath.Infrastructure.Auth;
+using PennyPath.Infrastructure.Gmail;
 using PennyPath.Infrastructure.Persistence;
 using PennyPath.Infrastructure.Security;
 using PennyPath.Infrastructure.Transactions;
@@ -57,6 +59,11 @@ builder.Services.AddSingleton<ITokenProtector, DataProtectionTokenProtector>();
 builder.Services.AddSingleton<ITransactionParser, SmsTransactionParser>();
 builder.Services.AddSingleton<ICategorizer, RuleCategorizer>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
+
+// Gmail import. Without Google:ClientId / ClientSecret / RedirectUri (environment variables) the feature reports "not set up".
+builder.Services.Configure<GoogleOptions>(builder.Configuration.GetSection(GoogleOptions.Section));
+builder.Services.AddHttpClient<IGoogleApi, GoogleHttpApi>(c => c.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddScoped<IGmailService, GmailService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
@@ -111,6 +118,10 @@ builder.Services.AddRateLimiter(o =>
     o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
         RateLimitPartition.GetFixedWindowLimiter(ClientKey(ctx),
             _ => new FixedWindowRateLimiterOptions { PermitLimit = 300, Window = TimeSpan.FromMinutes(1) }));
+    // Gmail endpoints reach out to Google, so they get a tight ceiling as well.
+    o.AddPolicy("gmail", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ClientKey(ctx),
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1) }));
     o.AddPolicy("auth", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ClientKey(ctx),
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) }));
