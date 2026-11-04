@@ -53,7 +53,7 @@ function EditRow({ row, onSave, onCancel, error }: EditRowProps) {
               <option value="Income">In (received)</option>
             </select>
           </label>
-          {error && <p role="alert" style={{ color: '#b00020', margin: 0 }}>{error}</p>}
+          {error && <p role="alert">{error}</p>}
           <div>
             <button onClick={save}>Save</button> <button onClick={onCancel}>Cancel</button>
           </div>
@@ -138,9 +138,9 @@ export default function TransactionList({ month, categories, version, onChanged,
   }
 
   return (
-    <section style={{ display: 'grid', gap: '0.75rem' }}>
+    <section className="card">
       <h2>Transactions</h2>
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="filters">
         <input type="search" aria-label="Search by where it was spent or amount" placeholder="Search place or amount" maxLength={100}
           value={search} onChange={(e) => setSearch(e.target.value)} />
         <select aria-label="Filter by category" value={category} onChange={(e) => resetPage(setCategoryFilter)(e.target.value)}>
@@ -157,7 +157,7 @@ export default function TransactionList({ month, categories, version, onChanged,
           <input type="checkbox" checked={allMonths} onChange={(e) => resetPage(setAllMonths)(e.target.checked)} /> All months
         </label>
       </div>
-      <p style={{ margin: 0 }}>{allMonths ? 'Showing every month.' : `Showing ${month}, the month chosen above.`}</p>
+      <p className="muted">{allMonths ? 'Showing every month.' : `Showing ${month}, the month chosen above.`}</p>
 
       {data === null ? (
         <p>Loading...</p>
@@ -165,7 +165,7 @@ export default function TransactionList({ month, categories, version, onChanged,
         <p>{filtered ? 'No transactions match these filters.' : allMonths ? 'No transactions yet.' : 'No transactions in this month.'}</p>
       ) : (
         <>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="table-wrap"><table>
             <thead>
               <tr>
                 <th align="left">Date</th><th align="left">Where / what</th><th align="left">Category</th>
@@ -203,7 +203,7 @@ export default function TransactionList({ month, categories, version, onChanged,
                         <button onClick={() => act(() => setTransfer(t.id, true))}>Mark as transfer</button>
                       )}
                     </td>
-                    <td align="right" style={{ color: t.type === 'Income' ? '#1b7f3b' : undefined }}>
+                    <td align="right" style={t.type === 'Income' ? { color: 'var(--good)', fontWeight: 600 } : undefined}>
                       {t.type === 'Income' ? '+' : '-'}{inr.format(t.amount)}
                     </td>
                     <td>
@@ -213,8 +213,8 @@ export default function TransactionList({ month, categories, version, onChanged,
                 ),
               )}
             </tbody>
-          </table>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          </table></div>
+          <div className="pager">
             <button onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>Previous</button>
             <span>{from}-{to} of {total} (page {shownPage} of {pages})</span>
             <button onClick={() => setPage((p) => p + 1)} disabled={page >= pages}>Next</button>

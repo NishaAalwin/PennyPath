@@ -57,20 +57,20 @@ export default function PrivacyPanel({ onSessionExpired }: Props) {
   }
 
   return (
-    <section style={{ display: 'grid', gap: '0.75rem', marginTop: '1.5rem' }}>
+    <section className="card">
       <h2>Privacy and security</h2>
-      {error && <p role="alert" style={{ color: '#b00020', margin: 0 }}>{error}</p>}
+      {error && <p role="alert">{error}</p>}
 
       <label>
         <input type="checkbox" checked={ai === true} disabled={ai === null} onChange={(e) => toggle(e.target.checked)} />{' '}
         Allow AI features to use my data
       </label>
-      <p style={{ margin: 0 }}>
+      <p className="muted">
         Off by default. No AI feature is active yet. If you turn this on, only merchant names and monthly totals could ever be
         sent, never account numbers, balances or message text, and you can turn it off at any time.
       </p>
 
-      <button onClick={signOutEverywhere}>Sign out of all devices</button>
+      <div><button className="btn-quiet" onClick={signOutEverywhere}>Sign out of all devices</button></div>
 
       <details>
         <summary>Recent security activity ({events.length})</summary>

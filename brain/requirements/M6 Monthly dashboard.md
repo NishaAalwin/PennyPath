@@ -33,7 +33,7 @@ User decision 2026-11-03 ([[Data minimisation]]): "summarised" means totals by *
 - [x] Hover tooltip, keyboard focus and pointer behaviour tested in a real browser: tooltip shows income/spent/saved on pointer and on keyboard focus and hides on leave; summary numbers match (Edge, `scripts/browser-e2e.mjs`)
 - [ ] No texture fallback (opt-in backup channel in the skill) and no direct labels on columns; identity rests on legend + tooltip + table
 - [ ] Negative net spend in a month (refunds larger than spending) is drawn as no column; the tooltip and table show the real value
-- [ ] Chart card carries its own light/dark surface because the app itself has no theme yet
+- [x] Page-wide light/dark blue-gradient theme added 2026-11-04 (`frontend/src/index.css`); chart cards sit on the theme surface. Browser 43/43 re-run; screenshots checked in light, dark and 390 px
 - [ ] Message with no date uses the import date (parser fallback), which can put it in the wrong month
 - [x] Browser check of the panel (month picker, totals, bars, chart, tables)
 

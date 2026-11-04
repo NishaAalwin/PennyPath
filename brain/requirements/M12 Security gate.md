@@ -30,7 +30,7 @@ verified: 193 backend + 32 frontend tests; live over HTTPS on the compose stack;
 - No alerting or monitoring on the audit log.
 - Local HTTPS uses Caddy's own CA; a real domain is needed for a public deployment (hosting undecided).
 - Docker images are not scanned; the stack was not penetration tested.
-- Dark mode: chart cards theme themselves; the rest of the page does not.
+- Dark mode now covers the whole page (blue-gradient theme, 2026-11-04); contrast was looked at in screenshots, not measured with a tool.
 - The browser script is not in CI.
 
 See [[Security checklist]] for the full open list.

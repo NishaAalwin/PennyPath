@@ -25,7 +25,7 @@ export default function AuthForm({ onAuthenticated }: Props) {
   }
 
   return (
-    <form onSubmit={submit} style={{ display: 'grid', gap: '0.75rem' }}>
+    <form onSubmit={submit} className="card auth-card">
       <h2>{mode === 'login' ? 'Log in' : 'Create your account'}</h2>
       <label>
         Email
@@ -38,8 +38,8 @@ export default function AuthForm({ onAuthenticated }: Props) {
           autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password}
           onChange={(e) => setPassword(e.target.value)} style={{ display: 'block', width: '100%' }} />
       </label>
-      {mode === 'register' && <small>At least 8 characters.</small>}
-      {error && <p role="alert" style={{ color: '#b00020', margin: 0 }}>{error}</p>}
+      {mode === 'register' && <small className="muted">At least 8 characters.</small>}
+      {error && <p role="alert">{error}</p>}
       <button type="submit" disabled={busy}>{busy ? 'Please wait...' : mode === 'login' ? 'Log in' : 'Sign up'}</button>
       <button type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(null) }}>
         {mode === 'login' ? 'Need an account? Sign up' : 'Have an account? Log in'}

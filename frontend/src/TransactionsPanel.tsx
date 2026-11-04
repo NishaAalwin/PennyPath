@@ -54,30 +54,32 @@ export default function Transactions({ onSessionExpired }: Props) {
   }
 
   return (
-    <section style={{ display: 'grid', gap: '0.75rem' }}>
+    <>
       <SummaryPanel summary={summary} trend={trend} month={month} onMonthChange={setMonth} />
 
-      <h2>Import SMS</h2>
-      <p style={{ margin: 0 }}>Paste your bank SMS messages here, with a blank line between messages. Only the amount, where it was spent, the date and whether it was money in or out are saved. The message text is not stored.</p>
-      <textarea rows={6} value={text} onChange={(e) => setText(e.target.value)}
-        placeholder="Sent Rs.250.00 From HDFC Bank A/c *1234 To SWIGGY On 02/11/26" />
-      <button onClick={submit} disabled={busy}>{busy ? 'Importing...' : 'Import'}</button>
-      {error && <p role="alert" style={{ color: '#b00020', margin: 0 }}>{error}</p>}
-      {result && (
-        <p style={{ margin: 0 }}>
-          Imported {result.imported}, skipped {result.duplicates} already imported
-          {result.possibleDuplicates > 0 && `, ${result.possibleDuplicates} look like duplicates (check below)`}
-          {result.unparsed.length > 0 && `, could not read ${result.unparsed.length}`}.
-        </p>
-      )}
-      {result && result.unparsed.length > 0 && (
-        <details>
-          <summary>Messages that were not recognised (shown now only, not saved)</summary>
-          <ul>{result.unparsed.map((m, i) => <li key={i}>{m}</li>)}</ul>
-        </details>
-      )}
+      <section className="card">
+        <h2>Import SMS</h2>
+        <p className="muted">Paste your bank SMS messages here, with a blank line between messages. Only the amount, where it was spent, the date and whether it was money in or out are saved. The message text is not stored.</p>
+        <textarea rows={6} value={text} onChange={(e) => setText(e.target.value)}
+          placeholder="Sent Rs.250.00 From HDFC Bank A/c *1234 To SWIGGY On 02/11/26" />
+        <div><button onClick={submit} disabled={busy}>{busy ? 'Importing...' : 'Import'}</button></div>
+        {error && <p role="alert">{error}</p>}
+        {result && (
+          <p>
+            Imported {result.imported}, skipped {result.duplicates} already imported
+            {result.possibleDuplicates > 0 && `, ${result.possibleDuplicates} look like duplicates (check below)`}
+            {result.unparsed.length > 0 && `, could not read ${result.unparsed.length}`}.
+          </p>
+        )}
+        {result && result.unparsed.length > 0 && (
+          <details>
+            <summary>Messages that were not recognised (shown now only, not saved)</summary>
+            <ul>{result.unparsed.map((m, i) => <li key={i}>{m}</li>)}</ul>
+          </details>
+        )}
+      </section>
 
       <TransactionList month={month} categories={categories} version={version} onChanged={refresh} onError={handleError} />
-    </section>
+    </>
   )
 }

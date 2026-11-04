@@ -36,22 +36,38 @@ export default function App() {
   }
 
   return (
-    <main style={{ fontFamily: 'system-ui', maxWidth: 480, margin: '4rem auto', padding: '0 1rem' }}>
-      <h1>PennyPath</h1>
-      <p>Your path to financial growth.</p>
+    <main className="app">
+      <header className="hero">
+        <div className="brand">
+          <span className="logo" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 25 L12 16 L18 21 L28 8" />
+              <path d="M21 8 H28 V15" />
+            </svg>
+          </span>
+          <div>
+            <h1>PennyPath</h1>
+            <p className="tagline">Your path to financial growth.</p>
+          </div>
+        </div>
+        {email && (
+          <div className="user-chip">
+            <span>Signed in as <strong>{email}</strong></span>
+            <button onClick={logout}>Log out</button>
+          </div>
+        )}
+      </header>
       {email === undefined ? (
-        <p>Checking your session...</p>
+        <p className="api-status">Checking your session...</p>
       ) : email ? (
-        <section>
-          <p>Signed in as <strong>{email}</strong></p>
-          <button onClick={logout}>Log out</button>
+        <div className="stack">
           <TransactionsPanel onSessionExpired={signedOut} />
           <PrivacyPanel onSessionExpired={signedOut} />
-        </section>
+        </div>
       ) : (
         <AuthForm onAuthenticated={setEmail} />
       )}
-      <p style={{ marginTop: '2rem', color: '#666' }}>
+      <p className="api-status">
         API: {healthError ? `unreachable (${healthError})` : health ? `${health.status} (database: ${health.database})` : 'checking...'}
       </p>
     </main>

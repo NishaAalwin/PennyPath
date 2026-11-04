@@ -66,7 +66,7 @@ const HELPERS = `
     el.dispatchEvent(new Event(el instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }));
   };
   window.__btn = (text) => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === text);
-  window.__text = () => document.body.innerText;
+  window.__text = () => document.body.innerText.replace(/\\s*\\n\\s*(?=₹)/g, ' ');
   window.__txRows = () => { const t = [...document.querySelectorAll('table')].find((x) => x.querySelector('thead')?.textContent.includes('Where / what')); return t ? [...t.querySelectorAll('tbody tr')] : []; };
 `
 async function install() { await ev(HELPERS) }
@@ -119,7 +119,7 @@ check('Import reports 5 imported, 1 possible duplicate, 1 unreadable', /Imported
 
 // ---------------------------------------------------------------- summary
 await waitFor(`__text().includes('Saved')`, 'summary')
-const summaryLine = await ev(`__text().split('\\n').find((l) => l.includes('Income') && l.includes('Spent'))`)
+const summaryLine = await ev(`document.querySelector('.stats').innerText.replace(/\\s+/g, ' ')`)
 check('Summary: income 15,000, spent 600, saved 14,400', /15,000\.00/.test(summaryLine) && /₹600\.00/.test(summaryLine) && /14,400\.00/.test(summaryLine), summaryLine)
 check('Summary says one duplicate is left out of the totals', await ev(`__text().includes('1 possible duplicate or transfer entry is left out')`))
 

@@ -178,5 +178,5 @@ User decision: read and keep only amount, where/what (merchant), date and debit/
 ### Known limitations
 - Not tested: real-domain TLS (Let's Encrypt), load/rate-limit behaviour, behaviour after `docker compose down -v` (would lose the key ring and database), a real Gmail token round trip (no Gmail code yet).
 - Browser checks ran in headless Edge only (no Firefox or Safari; SameSite=Strict and `__Host-` cookies behave the same in current Chrome-family browsers, unchecked elsewhere).
-- Chart cards theme themselves for dark mode; the rest of the page stays light.
+- Whole page has a blue-gradient light/dark theme (2026-11-04); text contrast was checked by eye in screenshots, not measured.
 - The app moved to https://localhost:8443; the old ports no longer answer.

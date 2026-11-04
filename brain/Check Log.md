@@ -53,3 +53,9 @@ Newest first. One entry per task: date · task · notes checked · result · gap
 ## 2026-11-03 · Create the brain vault
 - Notes checked: n/a (vault created from `docs/requirements.md`, `docs/security.md`, `docs/verification.md`).
 - Initial Code check ticks reflect the state recorded in those docs at commit 98faa8b; they were **not** re-run when the vault was created. First real task should re-verify them.
+
+## 2026-11-04 · Blue-gradient UI restyle
+- Notes checked: [[M6 Monthly dashboard]] (summary/chart/stat tiles), [[M7 Transaction list]] (table, filters, paging, edit), [[M1 Sign up and login]] (form), [[M12 Security gate]] (CSP, forms), [[Non-functional requirements]].
+- Change: new `frontend/src/index.css` theme (blue gradient page, cards, stat tiles, gradient buttons, light + dark, narrow-screen layout); class names replace most inline styles; page title "PennyPath"; no behaviour, API or dependency change. System fonts only, styles from `'self'`, so the CSP is unchanged.
+- Evidence: 32 frontend tests, lint and build pass; web image rebuilt; `scripts/browser-e2e.mjs` 43/43 (two checks adapted to the new stat-tile markup); screenshots viewed in light, dark and 390 px.
+- Gaps: contrast not measured by a tool; the transactions table scrolls sideways on phones; Android/Safari/Firefox not viewed.
