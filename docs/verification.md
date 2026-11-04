@@ -207,7 +207,7 @@ User decision: read and keep only amount, where/what (merchant), date and debit/
 ## Hardening pass (2026-11-04)
 | Check | Result | Evidence |
 |---|---|---|
-| Forged bank emails refused | **Verified (unit)** | 14 verifier tests (forged header, failed signature, look-alike domains, other bank signing) and a sync test with three forged mails |
+| Forged bank emails refused | **Verified (unit)** | 13 verifier cases (forged header, failed signature, look-alike domains, other bank signing) and a sync test with three forged mails |
 | Backend tests | **Verified** | 269 pass |
 | Frontend | **Verified** | 40 tests, lint, build, audit clean |
 | Browser | **Verified** | 47/47 twice in a row (one earlier run stopped at the keyboard-focus tooltip step and passed on rerun; cause not investigated, treated as a timing flake) |

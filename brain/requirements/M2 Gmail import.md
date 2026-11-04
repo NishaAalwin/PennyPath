@@ -25,7 +25,7 @@ needs-from-user: Google OAuth client id/secret in `.env` (docs/operations.md §8
 - [x] UI: card in the Transactions tab (connect, sync, disconnect, result, subjects of unreadable emails, plain message when not set up) — `GmailPanel.tsx`, `gmail.ts`
 - [ ] **Real Google round trip** — not done; needs the user's OAuth client. First real connection is the real test
 - [ ] **Accuracy on real bank emails** — unmeasured; parser tested on formats written from memory; unreadable emails are listed (subject only) so rules can be tuned
-- [x] Forged senders refused: only emails whose sender Gmail verified (DKIM or DMARC pass, written by mx.google.com, domain on the bank list and matching From) are imported; skipped ones are counted in the result — `SenderVerifier`, 14 tests
+- [x] Forged senders refused: only emails whose sender Gmail verified (DKIM or DMARC pass, written by mx.google.com, domain on the bank list and matching From) are imported; skipped ones are counted in the result — `SenderVerifier`, 13 test cases plus a sync test
 - [ ] Sender list is by domain and may miss the user's bank; a bank that does not pass DKIM/DMARC will be skipped (visible in the sync result); not yet seen on real mail
 - [ ] Testing mode: grant expires after 7 days; Google's restricted-scope verification (needed beyond ≤ 100 test users) not started
 - [ ] Unreadable alert-looking emails are re-read on every sync; deleted rows can return if inside the one-day overlap
