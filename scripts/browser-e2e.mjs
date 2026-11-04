@@ -67,6 +67,7 @@ const HELPERS = `
   };
   window.__btn = (text) => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === text);
   window.__text = () => document.body.innerText.replace(/\\s*\\n\\s*(?=₹)/g, ' ');
+  window.__tab = (name) => { const t = [...document.querySelectorAll('[role=tab]')].find((b) => b.textContent.trim() === name); t.click(); return t.getAttribute('aria-selected') };
   window.__txRows = () => { const t = [...document.querySelectorAll('table')].find((x) => x.querySelector('thead')?.textContent.includes('Where / what')); return t ? [...t.querySelectorAll('tbody tr')] : []; };
 `
 async function install() { await ev(HELPERS) }
@@ -103,6 +104,7 @@ const storage = await ev(`JSON.stringify({ local: Object.keys(localStorage), ses
 check('No token or session data in localStorage / sessionStorage', storage === '{"local":[],"session":[]}', storage)
 
 // ---------------------------------------------------------------- import
+const ST = "document.querySelector('.stats').textContent.replace(/\\s+/g, ' ')"
 const SMS = [
   'Dear Customer, Rs. 15,000.00 credited to your A/c XX5678 on 01-11-2026 by salary',
   'Sent Rs.250.00 From HDFC Bank A/c *1234 To SWIGGY On 02/11/26 Ref 4567890123',
@@ -111,6 +113,7 @@ const SMS = [
   'Refund of Rs 100.00 credited to A/c XX1234 on 03-11-26 from AMAZON.',
   'Hello, your parcel is out for delivery',
 ].join('\n\n')
+await ev(`__tab('Transactions')`)
 await ev(`__setValue(document.querySelector('textarea'), ${JSON.stringify(SMS)})`)
 await ev(`__btn('Import').click()`)
 await waitFor(`__text().includes('Imported 5')`, 'import result')
@@ -118,12 +121,17 @@ const importLine = await ev(`__text().split('\\n').find((l) => l.startsWith('Imp
 check('Import reports 5 imported, 1 possible duplicate, 1 unreadable', /Imported 5/.test(importLine) && /1 look like duplicates/.test(importLine) && /could not read 1/.test(importLine), importLine)
 
 // ---------------------------------------------------------------- summary
+await ev(`__tab('Summary')`)
 await waitFor(`__text().includes('Saved')`, 'summary')
 const summaryLine = await ev(`document.querySelector('.stats').innerText.replace(/\\s+/g, ' ')`)
 check('Summary: income 15,000, spent 600, saved 14,400', /15,000\.00/.test(summaryLine) && /₹600\.00/.test(summaryLine) && /14,400\.00/.test(summaryLine), summaryLine)
 check('Summary says one duplicate is left out of the totals', await ev(`__text().includes('1 possible duplicate or transfer entry is left out')`))
 
-// ---------------------------------------------------------------- charts
+// ---------------------------------------------------------------- tabs and charts
+check('Four tabs exist: Summary, Income and spending by month, Transactions, Privacy and security',
+  (await ev(`[...document.querySelectorAll('[role=tab]')].map((t) => t.textContent).join('|')`)) === 'Summary|Income and spending by month|Transactions|Privacy and security')
+check('Only the selected tab panel is shown', await ev(`[...document.querySelectorAll('[role=tabpanel]')].filter((p) => !p.hidden).length === 1`))
+await ev(`__tab('Income and spending by month')`)
 const chart = await ev(`JSON.stringify({ svg: document.querySelectorAll('svg[role=group]').length, slots: document.querySelectorAll('.viz-slot').length, bars: document.querySelectorAll('.viz-bar-row').length, legend: [...document.querySelectorAll('.viz-legend li')].map((l) => l.textContent), tables: document.querySelectorAll('.viz details').length })`)
 const c = JSON.parse(chart)
 check('Trend chart: one SVG, 6 month slots, legend Income/Spent', c.svg === 1 && c.slots === 6 && c.legend.join() === 'Income,Spent', chart)
@@ -142,6 +150,7 @@ check('Keyboard focus on a month shows the same tooltip', true)
 await ev(`document.activeElement.blur()`)
 
 // ---------------------------------------------------------------- transaction list
+await ev(`__tab('Transactions')`)
 await waitFor(`__txRows().length >= 5`, 'list rows')
 const rowCount = await ev(`__txRows().length`)
 check('List shows this month\'s 5 rows including the flagged duplicate', rowCount >= 5, `rows=${rowCount}`)
@@ -171,8 +180,8 @@ check('An invalid edit (-5) is refused with the server message', await ev(`docum
 await ev(`__setValue(document.querySelector('input[type=number]'), '500')`)
 await ev(`__btn('Save').click()`)
 await waitFor(`!__btn('Save')`, 'edit saved')
-await waitFor(`__text().includes('₹650.00')`, 'summary reflects the edit')
-check('A valid edit (450 -> 500) updates the row and the summary (spent 250+500-100 = 650)', await ev(`__text().includes('₹500.00') && __text().includes('₹650.00')`))
+await waitFor(`${ST}.includes('Spent ₹650.00')`, 'summary reflects the edit')
+check('A valid edit (450 -> 500) updates the row and the summary (spent 250+500-100 = 650)', await ev(`__text().includes('₹500.00') && ${ST}.includes('Spent ₹650.00')`))
 
 // ---------------------------------------------------------------- category, duplicate, transfer
 await ev("(() => { const tr = __txRows().find((r) => r.children[1]?.textContent === 'Amazon' && r.textContent.includes('₹500.00')); __setValue(tr.querySelector('select'), 'Entertainment'); })()")
@@ -180,14 +189,15 @@ await waitFor("[...document.querySelectorAll('.viz-bar-name')].some((n) => n.tex
 check('Changing a row\'s category in the dropdown moves its spending to that category in the summary', true)
 
 await ev("(() => { const tr = __txRows().find((r) => r.textContent.includes('Possible duplicate')); [...tr.querySelectorAll('button')].find((b) => b.textContent === 'Not a duplicate').click(); })()")
-await waitFor("__text().includes('Spent ₹900.00')", 'duplicate counted after "Not a duplicate"')
+await waitFor(""+ST+".includes('Spent ₹900.00')", 'duplicate counted after "Not a duplicate"')
 check('"Not a duplicate" puts the row back into the totals (spent 650 -> 900)', await ev("!__text().includes('Possible duplicate')"))
 
 await ev("(() => { const tr = __txRows().find((r) => r.children[1]?.textContent === 'Swiggy'); [...tr.querySelectorAll('button')].find((b) => b.textContent === 'Mark as transfer').click(); })()")
-await waitFor("__text().includes('Spent ₹650.00') && __text().includes('Not a transfer')", 'transfer excluded from totals')
+await waitFor(""+ST+".includes('Spent ₹650.00') && __text().includes('Not a transfer')", 'transfer excluded from totals')
 check('"Mark as transfer" takes the row out of the totals (spent 900 -> 650) and shows "Not a transfer"', true)
 
 // ---------------------------------------------------------------- privacy panel
+await ev(`__tab('Privacy and security')`)
 check('Privacy panel: AI consent is off by default', await ev(`(() => { const c = [...document.querySelectorAll('input[type=checkbox]')].find((i) => i.parentElement.textContent.includes('Allow AI')); return c && !c.checked })()`))
 await ev(`[...document.querySelectorAll('input[type=checkbox]')].find((i) => i.parentElement.textContent.includes('Allow AI')).click()`)
 await waitFor(`[...document.querySelectorAll('input[type=checkbox]')].find((i) => i.parentElement.textContent.includes('Allow AI')).checked`, 'consent on')
@@ -200,6 +210,9 @@ check('Security activity lists the account creation and the consent change', /Ac
 // ---------------------------------------------------------------- screenshots
 const shot = async (name) => writeFileSync(`${SP}/${name}.png`, Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).data, 'base64'))
 await ev(`window.scrollTo(0, 0)`)
+await ev(`document.querySelector('[role=tab][aria-selected=true]').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))`)
+await sleep(300)
+check('Keyboard: ArrowLeft on the active tab moves to the previous tab', (await ev(`document.querySelector('[role=tab][aria-selected=true]').textContent`)) === 'Transactions')
 await shot('app-light')
 await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] })
 await sleep(300)
@@ -218,6 +231,7 @@ check('CSP blocks a request to another origin (connect-src self)', xhr.startsWit
 
 // ---------------------------------------------------------------- paging
 const MANY = Array.from({ length: 30 }, (_, i) => 'Rs 10.00 spent at PAGETEST' + (i + 1) + ' on 02-11-26').join('\n\n')
+await ev(`__tab('Transactions')`)
 await ev(`__setValue(document.querySelector('textarea'), ${JSON.stringify(MANY)})`)
 await ev("__btn('Import').click()")
 await waitFor("__text().includes('Imported 30')", 'bulk import')

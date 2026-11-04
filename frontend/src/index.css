@@ -151,3 +151,24 @@ summary { cursor: pointer; font-weight: 600; color: var(--accent); }
   button { transition: none; }
   button:hover:not(:disabled) { transform: none; }
 }
+
+/* ---- tabs ---- */
+[hidden] { display: none !important; }
+.month-bar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; color: #fff;
+}
+.month-bar input { color: var(--ink); }
+.month-bar .muted { color: #dcecff; }
+.tabs {
+  display: flex; gap: 6px; overflow-x: auto; margin-bottom: 18px; padding: 6px;
+  background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 14px;
+  backdrop-filter: blur(6px); scrollbar-width: thin;
+}
+button.tab {
+  flex: 0 0 auto; color: #fff; background: transparent; box-shadow: none; border-radius: 10px; padding: 9px 16px; white-space: nowrap;
+}
+button.tab:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); transform: none; }
+button.tab[aria-selected='true'] { background: var(--card); color: var(--accent); box-shadow: 0 2px 8px rgba(8, 30, 80, 0.3); }
+.tab-panel { animation: tab-in 0.18s ease-out; }
+@keyframes tab-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .tab-panel { animation: none; } }

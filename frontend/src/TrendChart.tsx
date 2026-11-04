@@ -29,7 +29,6 @@ export default function TrendChart({ months }: { months: TrendMonth[] }) {
 
   return (
     <div className="viz">
-      <h3>Income and spending by month</h3>
       <p className="viz-sub">Last {months.length} months, in rupees.</p>
       <ul className="viz-legend" aria-label="Legend">
         <li><span className="viz-swatch s1" aria-hidden="true" />Income</li>

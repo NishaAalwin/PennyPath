@@ -61,8 +61,7 @@ export default function App() {
         <p className="api-status">Checking your session...</p>
       ) : email ? (
         <div className="stack">
-          <TransactionsPanel onSessionExpired={signedOut} />
-          <PrivacyPanel onSessionExpired={signedOut} />
+          <TransactionsPanel onSessionExpired={signedOut} privacy={<PrivacyPanel onSessionExpired={signedOut} />} />
         </div>
       ) : (
         <AuthForm onAuthenticated={setEmail} />

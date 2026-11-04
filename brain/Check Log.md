@@ -59,3 +59,9 @@ Newest first. One entry per task: date · task · notes checked · result · gap
 - Change: new `frontend/src/index.css` theme (blue gradient page, cards, stat tiles, gradient buttons, light + dark, narrow-screen layout); class names replace most inline styles; page title "PennyPath"; no behaviour, API or dependency change. System fonts only, styles from `'self'`, so the CSP is unchanged.
 - Evidence: 32 frontend tests, lint and build pass; web image rebuilt; `scripts/browser-e2e.mjs` 43/43 (two checks adapted to the new stat-tile markup); screenshots viewed in light, dark and 390 px.
 - Gaps: contrast not measured by a tool; the transactions table scrolls sideways on phones; Android/Safari/Firefox not viewed.
+
+## 2026-11-04 · Tabs for each section
+- Notes checked: [[M6 Monthly dashboard]], [[M7 Transaction list]], [[M12 Security gate]] (privacy panel, CSP).
+- Change: Summary, Income and spending by month, Transactions (import above the list) and Privacy and security are separate tabs (`Tabs.tsx`); the month picker moved above the tabs and drives summary, chart and list. No API, data or dependency change.
+- Evidence: 32 frontend tests, lint, build; web image rebuilt; `scripts/browser-e2e.mjs` 46/46 (tab existence, single visible panel, arrow-key navigation added; steps now switch tabs); screenshots of each tab and at 390 px viewed.
+- Gaps: selected tab is not remembered after reload; Safari/Firefox/mobile devices not viewed.

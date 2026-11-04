@@ -157,7 +157,7 @@ export default function TransactionList({ month, categories, version, onChanged,
           <input type="checkbox" checked={allMonths} onChange={(e) => resetPage(setAllMonths)(e.target.checked)} /> All months
         </label>
       </div>
-      <p className="muted">{allMonths ? 'Showing every month.' : `Showing ${month}, the month chosen above.`}</p>
+      <p className="muted">{allMonths ? 'Showing every month.' : `Showing ${month}, the month chosen at the top.`}</p>
 
       {data === null ? (
         <p>Loading...</p>

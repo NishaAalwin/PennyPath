@@ -34,6 +34,7 @@ User decision 2026-11-03 ([[Data minimisation]]): "summarised" means totals by *
 - [ ] No texture fallback (opt-in backup channel in the skill) and no direct labels on columns; identity rests on legend + tooltip + table
 - [ ] Negative net spend in a month (refunds larger than spending) is drawn as no column; the tooltip and table show the real value
 - [x] Page-wide light/dark blue-gradient theme added 2026-11-04 (`frontend/src/index.css`); chart cards sit on the theme surface. Browser 43/43 re-run; screenshots checked in light, dark and 390 px
+- [x] Sections are tabs (2026-11-04): Summary, Income and spending by month, Transactions (import + list), Privacy and security; one shared month picker; panels stay mounted so filters and drafts survive switching; ARIA tabs with arrow/Home/End keys — `frontend/src/Tabs.tsx`, `TransactionsPanel.tsx`; browser 46/46
 - [ ] Message with no date uses the import date (parser fallback), which can put it in the wrong month
 - [x] Browser check of the panel (month picker, totals, bars, chart, tables)
 
