@@ -3,7 +3,7 @@ import { describeSync, disconnectGmail, getGmailStatus, readGmailReturn, startGm
 
 const asFetch = (f: unknown) => f as unknown as typeof fetch
 const result = (over: Partial<GmailSyncResult> = {}): GmailSyncResult => ({
-  checked: 5, imported: 3, duplicates: 1, possibleDuplicates: 0, notRecognised: 1, notRecognisedSubjects: ['Statement'], moreAvailable: false, ...over,
+  checked: 5, imported: 3, duplicates: 1, possibleDuplicates: 0, notRecognised: 1, unverifiedSender: 0, notRecognisedSubjects: ['Statement'], moreAvailable: false, ...over,
 })
 
 describe('gmail api', () => {
@@ -51,8 +51,12 @@ describe('describeSync', () => {
     expect(describeSync(result({ moreAvailable: true }))).toContain('sync again')
   })
 
+  it('says when emails were skipped because the sender could not be verified', () => {
+    expect(describeSync(result({ unverifiedSender: 2 }))).toContain('skipped 2 whose sender Gmail could not verify');
+  })
+
   it('says so when there was nothing new', () => {
-    expect(describeSync(result({ checked: 0, imported: 0, duplicates: 0, notRecognised: 0, notRecognisedSubjects: [] }))).toBe('No new bank emails found.')
+    expect(describeSync(result({ checked: 0, imported: 0, duplicates: 0, notRecognised: 0, unverifiedSender: 0, notRecognisedSubjects: [] }))).toBe('No new bank emails found.')
   })
 })
 

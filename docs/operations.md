@@ -94,3 +94,10 @@ The Gmail import is off until you give the server a Google OAuth client. Nothing
 **If your bank is not in the list or an alert is not recognised:** the sync result lists the subjects of emails it could not read (shown once, not stored). Send the subject wording (no account numbers) and the sender domain and the list or parser can be extended.
 
 **Not verified against real Google yet.** The flow is tested against a stand-in for Google; the first real connection is the real test.
+
+## 9. Scanning the images for known vulnerabilities
+```
+docker compose build --pull
+./scripts/scan-images.sh        # needs Docker; downloads the Trivy scanner image and its database once
+```
+Exit code 1 means a HIGH or CRITICAL finding that already has a fix. After a rebuild, API, web and proxy system layers are clean; the open findings (Caddy binary, `gosu` in Postgres) are listed in docs/security.md. Run it after every pull and before exposing the app beyond your own machine.

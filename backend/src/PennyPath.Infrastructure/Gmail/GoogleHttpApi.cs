@@ -115,12 +115,19 @@ public class GoogleHttpApi(HttpClient http, IOptions<GoogleOptions> options) : I
 
         var root = doc.RootElement;
         var subject = string.Empty;
+        string? from = null;
+        var auth = new List<string>();
         if (root.TryGetProperty("payload", out var payload))
         {
             if (payload.TryGetProperty("headers", out var headers))
                 foreach (var h in headers.EnumerateArray())
-                    if (string.Equals(h.GetProperty("name").GetString(), "Subject", StringComparison.OrdinalIgnoreCase))
-                        subject = h.GetProperty("value").GetString() ?? string.Empty;
+                {
+                    var name = h.GetProperty("name").GetString();
+                    var value = h.GetProperty("value").GetString() ?? string.Empty;
+                    if (string.Equals(name, "Subject", StringComparison.OrdinalIgnoreCase)) subject = value;
+                    else if (string.Equals(name, "From", StringComparison.OrdinalIgnoreCase)) from = value;
+                    else if (string.Equals(name, "Authentication-Results", StringComparison.OrdinalIgnoreCase)) auth.Add(value);
+                }
         }
 
         var body = root.TryGetProperty("payload", out var p) ? ExtractBody(p) : string.Empty;
@@ -129,7 +136,7 @@ public class GoogleHttpApi(HttpClient http, IOptions<GoogleOptions> options) : I
         // India is the assumed market, so "the day it arrived" is the day in IST.
         var ms = root.TryGetProperty("internalDate", out var d) && long.TryParse(d.GetString(), NumberStyles.None, CultureInfo.InvariantCulture, out var v) ? v : 0;
         var received = DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeMilliseconds(ms).UtcDateTime.AddHours(5.5));
-        return new EmailItem(id, subject, body, received);
+        return new EmailItem(id, subject, body, received, from, auth);
     }
 
     public async Task RevokeAsync(string token, CancellationToken ct)

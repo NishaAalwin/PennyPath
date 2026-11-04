@@ -218,6 +218,24 @@ public sealed class GmailServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task An_email_that_only_claims_to_be_from_the_bank_is_not_imported()
+    {
+        await ConnectAsync(Asha);
+        _google.Messages["real"] = Emails.Debit("real");
+        // A forged alert: right look and sender address, but Gmail could not verify the signature.
+        _google.Messages["fake"] = Emails.Debit("fake", "CASINO", "99999.00") with { AuthenticationResults = ["mx.google.com; dkim=fail header.i=@hdfcbank.net; spf=softfail smtp.mailfrom=evil.example"] };
+        _google.Messages["none"] = Emails.Debit("none", "SCAM", "88888.00") with { AuthenticationResults = null };
+        _google.Messages["other"] = Emails.Debit("other", "PHISH", "77777.00") with { From = "Support <help@hdfcbank.net.evil.example>" };
+
+        var o = await _gmail.SyncAsync(Asha, null);
+
+        Assert.Equal(1, o.Result!.Imported);
+        Assert.Equal(3, o.Result.UnverifiedSender);
+        var row = await _db.Transactions.SingleAsync();
+        Assert.Equal(250m, row.Amount);
+    }
+
+    [Fact]
     public async Task Sync_keeps_no_email_text_only_the_parsed_fields_and_a_key_derived_from_the_message_id()
     {
         await ConnectAsync(Asha);

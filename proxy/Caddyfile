@@ -10,7 +10,17 @@
 
 {$SITE_ADDRESS:localhost:8443} {
 	encode zstd gzip
-	header -Server
+	header {
+		-Server
+		# Keep other sites from sharing a browsing context or loading our responses.
+		Cross-Origin-Opener-Policy same-origin
+		Cross-Origin-Resource-Policy same-origin
+	}
+
+	# Tell browsers to use HTTPS only, on a real domain. Not for localhost: the browser remembers HSTS per host name
+	# (any port), which would break plain-HTTP dev servers on localhost.
+	@public not host localhost 127.0.0.1
+	header @public Strict-Transport-Security "max-age=31536000"
 
 	# Caddy replaces any X-Forwarded-* sent by the client, so the API sees the real client address.
 	handle /api/* {

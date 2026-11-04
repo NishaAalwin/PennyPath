@@ -4,9 +4,10 @@ public record GmailStatus(bool Configured, bool Connected, DateTime? ConnectedAt
 
 /// <param name="Checked">Emails read this time (already imported ones are skipped before reading).</param>
 /// <param name="NotRecognisedSubjects">Subjects (shortened) of emails that looked like alerts but could not be read; shown once, never stored.</param>
+/// <param name="UnverifiedSender">Emails skipped because Gmail could not confirm they came from the bank they claim (possible forgery).</param>
 /// <param name="MoreAvailable">More matching emails exist than one sync reads; sync again.</param>
 public record GmailSyncResult(
-    int Checked, int Imported, int Duplicates, int PossibleDuplicates, int NotRecognised,
+    int Checked, int Imported, int Duplicates, int PossibleDuplicates, int NotRecognised, int UnverifiedSender,
     IReadOnlyList<string> NotRecognisedSubjects, bool MoreAvailable);
 
 public enum GmailSyncStatus { Ok, NotConfigured, NotConnected, NeedsReconnect, Busy, Failed }
@@ -14,7 +15,9 @@ public enum GmailSyncStatus { Ok, NotConfigured, NotConnected, NeedsReconnect, B
 public record GmailSyncOutcome(GmailSyncStatus Status, GmailSyncResult? Result = null);
 
 /// <summary>One email, already decoded to text. Held in memory while it is parsed and then dropped.</summary>
-public record EmailItem(string Id, string Subject, string Body, DateOnly ReceivedOn);
+public record EmailItem(
+    string Id, string Subject, string Body, DateOnly ReceivedOn,
+    string? From = null, IReadOnlyList<string>? AuthenticationResults = null);
 
 public interface IGmailService
 {

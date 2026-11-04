@@ -29,7 +29,7 @@ verified: 193 backend + 32 frontend tests; live over HTTPS on the compose stack;
 - Refresh tokens/sliding sessions, MFA, email verification and password reset ([[M10 Account lifecycle]]) are not built.
 - No alerting or monitoring on the audit log.
 - Local HTTPS uses Caddy's own CA; a real domain is needed for a public deployment (hosting undecided).
-- Docker images are not scanned; the stack was not penetration tested.
+- Docker images scanned 2026-11-04 (`scripts/scan-images.sh`): own layers clean; open: Caddy binary (Go runtime) and gosu in the Postgres image. Not penetration tested.
 - Dark mode now covers the whole page (blue-gradient theme, 2026-11-04); contrast was looked at in screenshots, not measured with a tool.
 - The browser script is not in CI.
 

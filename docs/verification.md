@@ -203,3 +203,16 @@ User decision: read and keep only amount, where/what (merchant), date and debit/
 - The sender list is by domain and may miss your bank; extend `GmailQuery.SenderDomains`.
 - A transaction you delete can come back if its email is inside the one-day overlap of the next sync.
 - Emails that look like alerts but cannot be read are re-read on every sync (they are not remembered).
+
+## Hardening pass (2026-11-04)
+| Check | Result | Evidence |
+|---|---|---|
+| Forged bank emails refused | **Verified (unit)** | 14 verifier tests (forged header, failed signature, look-alike domains, other bank signing) and a sync test with three forged mails |
+| Backend tests | **Verified** | 269 pass |
+| Frontend | **Verified** | 40 tests, lint, build, audit clean |
+| Browser | **Verified** | 47/47 twice in a row (one earlier run stopped at the keyboard-focus tooltip step and passed on rerun; cause not investigated, treated as a timing flake) |
+| Headers live | **Verified** | COOP and CORP present on the page; HSTS absent on localhost and present when the Host is a real domain (tested on a throwaway Caddy) |
+| Logs hold no tokens | **Verified** | searched the API logs for token, code, state and secret values: only column names matched |
+| Image scan | **Verified, with open items** | API, web, proxy system layers 0 fixable; Caddy binary 6 HIGH and gosu in Postgres 26 HIGH (Go runtime) remain |
+| Real Google, real bank email formats, pen test | **Not verified** | unchanged |
+| Whether your bank passes Gmail DKIM/DMARC | **Not verified** | skipped emails are counted in the sync result so this shows up on the first real sync |

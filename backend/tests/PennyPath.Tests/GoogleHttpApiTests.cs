@@ -143,7 +143,7 @@ public class GoogleHttpApiTests
     {
         var text = "Rs 450 spent on card XX9876 at AMAZON on 02-Nov-26";
         var json = "{\"id\":\"m1\",\"internalDate\":\"1793556000000\",\"payload\":{\"mimeType\":\"multipart/alternative\","
-            + "\"headers\":[{\"name\":\"From\",\"value\":\"alerts@hdfcbank.net\"},{\"name\":\"Subject\",\"value\":\"Card spend alert\"}],"
+            + "\"headers\":[{\"name\":\"From\",\"value\":\"alerts@hdfcbank.net\"},{\"name\":\"Subject\",\"value\":\"Card spend alert\"},{\"name\":\"Authentication-Results\",\"value\":\"mx.google.com; dkim=pass header.i=@hdfcbank.net\"}],"
             + "\"parts\":[{\"mimeType\":\"text/plain\",\"body\":{\"data\":\"" + B64Url(text) + "\"}},"
             + "{\"mimeType\":\"text/html\",\"body\":{\"data\":\"" + B64Url("<p>ignored html</p>") + "\"}}]}}";
         var (api, stub) = Create((_, _) => (HttpStatusCode.OK, json));
@@ -151,6 +151,8 @@ public class GoogleHttpApiTests
         var m = (await api.GetMessageAsync("t", "m1", CancellationToken.None))!;
 
         Assert.Equal("Card spend alert", m.Subject);
+        Assert.Equal("alerts@hdfcbank.net", m.From);
+        Assert.Equal(["mx.google.com; dkim=pass header.i=@hdfcbank.net"], m.AuthenticationResults);
         Assert.Equal(text, m.Body.Trim());
         // 1793556000000 ms = 2026-11-01 18:00 UTC = 2026-11-01 23:30 IST
         Assert.Equal(new DateOnly(2026, 11, 1), m.ReceivedOn);

@@ -73,3 +73,9 @@ Newest first. One entry per task: date · task · notes checked · result · gap
 - Security walk: every endpoint but the Google return address has `[Authorize]` and user-scoped queries; cross-user tests; no token or secret in any response, log or URL; CSRF header; no new package; docs/security.md updated with what is not done.
 - NOT verified: a real Google connection (needs the user's OAuth client), real bank email formats and accuracy. Marked "built, not verified against real Google".
 - Open: sender list by domain; no SPF/DKIM check; Testing-mode 7-day expiry; Google restricted-scope verification not started; unreadable emails re-read each sync.
+
+## 2026-11-04 · Security hardening pass (user: "this should be very secure")
+- Notes checked: [[M2 Gmail import]], [[M12 Security gate]], [[Security checklist]], [[Non-functional requirements]].
+- Did: (1) refuse forged bank emails (Gmail DKIM/DMARC verdict, Gmail-written header only, domain must be on the list and match From); (2) COOP/CORP everywhere and HSTS on real domains; (3) SQL logging off; (4) image scan with Trivy, base images refreshed, `apk upgrade` for web and proxy, proxy now built from `proxy/Dockerfile`, `scripts/scan-images.sh` added; (5) checked logs hold no tokens.
+- Evidence: 269 backend tests, 40 frontend tests, lint/build/audit clean, browser 47/47 twice (one earlier run flaked at the keyboard-focus step), live header checks, image rescan.
+- Still open (not claimed fixed): Caddy binary and gosu Go findings; not pen-tested; not tested with real Google; disk encryption and off-machine backups; MFA and password reset (M10).

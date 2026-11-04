@@ -133,7 +133,10 @@ public class GmailService(
                 var toRead = keys.Where(k => !known.Contains(k.Key)).Select(k => k.Value).ToList();
 
                 var items = await ReadAsync(access, toRead, ct);
-                var imported = await transactions.ImportEmailsAsync(userId, items, ct);
+
+                // A From address can be forged; only emails whose sender Gmail verified (DKIM / DMARC) are used.
+                var verified = items.Where(i => SenderVerifier.Check(i.From, i.AuthenticationResults, GmailQuery.SenderDomains) == SenderVerifier.Verdict.Verified).ToList();
+                var imported = await transactions.ImportEmailsAsync(userId, verified, ct);
 
                 // If the cap cut the list short, keep the old marker so the next sync carries on from the same point.
                 if (!more) conn.LastSyncAt = started;
@@ -142,7 +145,7 @@ public class GmailService(
 
                 return new(GmailSyncStatus.Ok, new GmailSyncResult(
                     items.Count, imported.Imported, known.Count + imported.Duplicates, imported.PossibleDuplicates,
-                    imported.NotRecognisedSubjects.Count, imported.NotRecognisedSubjects.Take(20).ToList(), more));
+                    imported.NotRecognisedSubjects.Count, items.Count - verified.Count, imported.NotRecognisedSubjects.Take(20).ToList(), more));
             }
             catch (GoogleAuthException)
             {

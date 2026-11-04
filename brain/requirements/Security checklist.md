@@ -32,6 +32,6 @@ Only amount, merchant, date, debit/credit, category/flags and a SHA-256 of the m
 6. No DB encryption at rest (use host disk/volume encryption); Data Protection key files unencrypted at rest; backups not scheduled or copied off-machine
 7. Gmail tokens are stored with `ITokenProtector` (done 2026-11-04); a real Google connection and sender spoofing (no SPF/DKIM check) remain open, see [[M2 Gmail import]]
 8. Audit log exists; no alerting or monitoring
-9. Docker images not scanned; not penetration tested (browser check was functional, not a pen test)
+9. Docker images scanned 2026-11-04 (`scripts/scan-images.sh`): API, web, proxy system layers clean; Caddy binary and gosu in Postgres still carry fixable Go findings (update when upstream ships); not penetration tested (browser check was functional, not a pen test)
 10. Account deletion and data export not implemented ([[M10 Account lifecycle]]); AI features not built (gate exists)
 11. Rate limit is per IP and not load-tested; on Docker Desktop all local requests share one address

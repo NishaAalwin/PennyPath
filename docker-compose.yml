@@ -26,6 +26,8 @@ services:
       ConnectionStrings__Default: Host=db;Database=pennypath;Username=pennypath;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       Jwt__Key: ${JWT_KEY:?Set JWT_KEY in .env (at least 32 random bytes)}
       Database__MigrateOnStartup: "true"
+      # Do not log every SQL statement; fewer details in the logs.
+      Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command: Warning
       # Trust X-Forwarded-For/-Proto only from the proxy's fixed address, so rate limits and the audit log see the real client.
       ForwardedHeaders__KnownProxies__0: 172.28.0.10
       # Key ring for encrypting stored secrets. It lives on a volume so it survives restarts and rebuilds.
@@ -62,7 +64,7 @@ services:
       - no-new-privileges:true
 
   proxy:
-    image: caddy:2-alpine
+    build: ./proxy
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-localhost:8443}
     volumes:

@@ -10,6 +10,7 @@ export type GmailSyncResult = {
   duplicates: number
   possibleDuplicates: number
   notRecognised: number
+  unverifiedSender: number
   notRecognisedSubjects: string[]
   moreAvailable: boolean
 }
@@ -26,11 +27,12 @@ export const disconnectGmail = (fetchFn: Fetch = fetch) => authed<void>('/api/gm
 
 /** Where the sync result is explained in words. */
 export function describeSync(r: GmailSyncResult): string {
-  if (r.checked === 0 && r.duplicates === 0 && r.notRecognised === 0) return 'No new bank emails found.'
+  if (r.checked === 0 && r.duplicates === 0 && r.notRecognised === 0 && r.unverifiedSender === 0) return 'No new bank emails found.'
   const parts = [`Imported ${r.imported}`]
   if (r.duplicates > 0) parts.push(`skipped ${r.duplicates} already imported`)
   if (r.possibleDuplicates > 0) parts.push(`${r.possibleDuplicates} look like duplicates (check the list)`)
   if (r.notRecognised > 0) parts.push(`could not read ${r.notRecognised}`)
+  if (r.unverifiedSender > 0) parts.push(`skipped ${r.unverifiedSender} whose sender Gmail could not verify as the bank`)
   return parts.join(', ') + (r.moreAvailable ? '. There are more emails: sync again to continue.' : '.')
 }
 

@@ -73,17 +73,25 @@ public sealed class FakeGoogleApi : IGoogleApi
 
 public static class Emails
 {
+    public const string Bank = "HDFC Bank <alerts@hdfcbank.net>";
+
+    /// <summary>What Gmail writes for a message that really was signed by the bank.</summary>
+    public static readonly string[] Auth =
+    [
+        "mx.google.com; dkim=pass header.i=@hdfcbank.net header.s=sel header.b=abc123; spf=pass smtp.mailfrom=hdfcbank.net; dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=hdfcbank.net",
+    ];
+
     public static EmailItem Debit(string id, string merchant = "SWIGGY", string amount = "250.00") =>
         new(id, $"Alert: INR {amount} debited",
             $"Dear Customer, INR {amount} debited from A/c XX1234 on 02-11-26 to {merchant}. UPI Ref 4567890123. If you did not make this transaction, call us. Never share your OTP.",
-            new DateOnly(2026, 11, 2));
+            new DateOnly(2026, 11, 2), Bank, Auth);
 
     public static EmailItem Salary(string id) =>
-        new(id, "Salary credited", "Rs. 45,000.00 credited to your A/c XX5678 on 01-11-2026 by ACME SALARY. Never share your OTP with anyone.", new DateOnly(2026, 11, 1));
+        new(id, "Salary credited", "Rs. 45,000.00 credited to your A/c XX5678 on 01-11-2026 by ACME SALARY. Never share your OTP with anyone.", new DateOnly(2026, 11, 1), Bank, Auth);
 
     public static EmailItem Statement(string id) =>
-        new(id, "Your October statement is ready", "Your monthly statement is ready to view. Thank you for banking with us.", new DateOnly(2026, 11, 3));
+        new(id, "Your October statement is ready", "Your monthly statement is ready to view. Thank you for banking with us.", new DateOnly(2026, 11, 3), Bank, Auth);
 
     public static EmailItem Otp(string id) =>
-        new(id, "OTP for your transaction", "123456 is your OTP for the transaction. Do not share it.", new DateOnly(2026, 11, 3));
+        new(id, "OTP for your transaction", "123456 is your OTP for the transaction. Do not share it.", new DateOnly(2026, 11, 3), Bank, Auth);
 }
