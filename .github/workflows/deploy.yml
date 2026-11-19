@@ -76,7 +76,7 @@ jobs:
       SHA: ${{ needs.plan.outputs.sha }}
       PREFIX: ${{ needs.plan.outputs.prefix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.plan.outputs.sha }}
           persist-credentials: false
@@ -124,7 +124,7 @@ jobs:
       RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
       VM_NAME: ${{ vars.AZURE_VM_NAME }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.plan.outputs.sha }}
           persist-credentials: false
