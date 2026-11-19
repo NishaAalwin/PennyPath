@@ -129,7 +129,7 @@ jobs:
           ref: ${{ needs.plan.outputs.sha }}
           persist-credentials: false
 
-      - uses: azure/login@v2
+      - uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
