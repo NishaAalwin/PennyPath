@@ -2,7 +2,7 @@
 id: M8
 release: MVP
 status: in-progress
-verified: compose up verified; GitHub CI green on 14be2e2. CI/CD workflows linted locally 2026-11-19 (actionlint, shellcheck, compose config, scan script); not yet run on GitHub; Azure deployment not yet verified
+verified: compose up verified; full CI green on GitHub on 51c349f (PR #1, 2026-11-19), including actionlint, shellcheck, Bicep build, compose config and image scan; Deploy and Azure not yet verified
 ---
 # M8 Deployed with Docker and a CI pipeline
 
@@ -11,7 +11,7 @@ verified: compose up verified; GitHub CI green on 14be2e2. CI/CD workflows linte
 - [x] Ports bind to `127.0.0.1` only; containers non-root, `no-new-privileges`, caps dropped
 - [x] `.github/workflows/ci.yml` builds + tests backend and frontend; fails on vulnerable packages
 - [x] `.github/workflows/codeql.yml`, `dependabot.yml`; least-privilege `permissions`
-- [ ] CI re-checked green on the latest commit
+- [x] CI re-checked green on the latest commit (51c349f, PR #1; the separate CodeQL alert check fails on old alerts in `scripts/browser-e2e.mjs`)
 - [x] Docker image scanning (Trivy) locally: `scripts/scan-images.sh`
 - [x] HTTPS / reverse proxy: Caddy ([[M12 Security gate]])
 - [x] Hosting target decided: Azure VM + docker compose ([[Constraints and decisions]] #3)
@@ -36,7 +36,7 @@ verified: compose up verified; GitHub CI green on 14be2e2. CI/CD workflows linte
 - [ ] Migrations still run on start (`Database__MigrateOnStartup`); database and key ring survive a redeploy
 - [ ] `docs/operations.md` explains first-time Azure setup, secrets, the Google redirect URI and rollback
 
-Ticks above mean "present in the code and linted locally", not "seen working on GitHub/Azure". Not yet verified: the `az bicep build` step (no Azure CLI on this machine), any run of the new CI or Deploy on GitHub, and the VM-side `.env`/image checks on a real VM.
+CI items above are verified on GitHub (51c349f). Deploy items are present in the code and linted, not yet seen working: Deploy has not run (it starts after merge to `main`), and the VM-side `.env`/image checks need a real VM.
 
 ### Known limits (accepted for now)
 - Actions are pinned to major tags (`@v4`, `@v2`), not commit SHAs; Dependabot keeps them current.

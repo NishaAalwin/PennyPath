@@ -12,7 +12,7 @@ Last updated: 2026-11-02
 | CORS for web origin | **Verified** | `Access-Control-Allow-Origin: http://localhost:8080` on API responses |
 | React page rendering the API result in a real browser | Not verified | Headless Edge returned no DOM output; verified indirectly (bundle built with `VITE_API_URL=http://localhost:5000`, CORS header present) |
 | API against the local (non-Docker) PostgreSQL 17 service | Not verified | The `pennypath` login fails because the DB/user hasn't been created yet; optional now that compose Postgres works |
-| GitHub Actions CI | **Verified** (old version) | Run on push of 14be2e2 (2026-11-02): backend, frontend and docker jobs all succeeded on GitHub. Repo: https://github.com/NishaAalwin/PennyPath. The 2026-11-19 version (adds `infra` job and image scan) has not run on GitHub yet |
+| GitHub Actions CI | **Verified** | 2026-11-19, PR #1 commit 51c349f: backend, frontend, infra (actionlint, shellcheck, Bicep build, compose config) and docker (build + Trivy, 0 CRITICAL) jobs passed on GitHub. CodeQL alert check fails on pre-existing alerts in `scripts/browser-e2e.mjs` |
 | CD (`deploy.yml`, replaces `cd.yml`) | Linted locally, not run | actionlint and shellcheck clean 2026-11-19; deploys each green `main` commit to the Azure VM. Needs the repo variables listed at the top of `deploy.yml`; until `AZURE_CLIENT_ID` is set it only builds, scans and pushes images |
 
 ## Fixes made during verification
