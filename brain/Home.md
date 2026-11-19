@@ -22,7 +22,7 @@ Every task is checked against this vault before it is called done. See [[Task Pr
 | M5 | rules + user correction done; AI fallback deferred; accuracy unmeasured |
 | M6 | done with gaps: summary, trend, charts and 10k-row timing done; browser hover/focus untested, no texture fallback |
 | M7 | done with gaps: search, filters, paging and edit built and live-verified on 10k rows; UI not browser-tested; manual add is M11 |
-| M8 | done (Docker + CI green) |
+| M8 | in progress: Docker + CI green on 14be2e2; full CI/CD workflows written and linted locally, not yet run on GitHub; Azure deploy not verified |
 | M9 | done with gaps: flags duplicates, links refunds, manual transfers; no email source yet, accuracy unmeasured |
 | M10 | done with gaps: email verification, password reset, optional TOTP two-factor, export, delete-my-account (rows proven gone on real Postgres); real SMTP not tested, sign-up still reveals existing emails |
 | M11 | not started (new) |

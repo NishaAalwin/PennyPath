@@ -1,0 +1,45 @@
+#cloud-config
+# First boot of the PennyPath VM: put Docker's data on the separate data disk, install Docker from Docker's own
+# repository, and prepare /opt/pennypath. The app itself is started by the deploy workflow (scripts/azure/vm-deploy.sh).
+package_update: true
+package_upgrade: true
+packages:
+  - ca-certificates
+  - curl
+  - jq
+  - unattended-upgrades
+
+write_files:
+  - path: /etc/docker/daemon.json
+    permissions: "0644"
+    content: |
+      {
+        "log-driver": "local",
+        "log-opts": { "max-size": "20m", "max-file": "5" },
+        "live-restore": true,
+        "no-new-privileges": true
+      }
+
+runcmd:
+  # Data disk (LUN 0) -> /var/lib/docker. Format only if it has no file system yet, so a re-attached disk keeps its data.
+  - |
+    set -eu
+    disk=/dev/disk/azure/scsi1/lun0
+    for i in $(seq 1 60); do [ -e "$disk" ] && break; sleep 2; done
+    [ -e "$disk" ] || { echo "data disk not found" >&2; exit 1; }
+    blkid "$disk" >/dev/null 2>&1 || mkfs.ext4 -q -L dockerdata "$disk"
+    mkdir -p /var/lib/docker
+    grep -q 'LABEL=dockerdata' /etc/fstab || echo 'LABEL=dockerdata /var/lib/docker ext4 defaults,nofail,discard 0 2' >> /etc/fstab
+    mount -a
+    mountpoint -q /var/lib/docker
+  # Docker Engine + compose plugin from Docker's signed apt repository.
+  - |
+    set -eu
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list
+    apt-get update -q
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -q docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    systemctl enable --now docker
+  - install -d -m 0700 /opt/pennypath

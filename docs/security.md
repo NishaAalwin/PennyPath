@@ -49,7 +49,7 @@ Account credentials, financial transactions (amounts, merchants, accounts), and 
 6. **Database is not encrypted at rest** (PostgreSQL does not do it here); use disk/volume encryption on the host. The **Data Protection key files are not encrypted at rest** either (no certificate configured). Backups are encrypted and restore-tested, but **not scheduled and not copied off the machine**.
 7. **Gmail (M2):** the encryption service and persisted key ring exist, but no Gmail code uses them yet. Only read-only scopes may be requested.
 8. **Audit log exists but nothing watches it:** no alerting, no log shipping, no tamper protection.
-9. **Docker base images are not scanned** (add Trivy or similar).
+9. ~~Docker base images are not scanned~~ Done: CI and deploy scan all three images with Trivy (`scripts/scan-images.sh`, `FAIL_ON=CRITICAL`): a fixable CRITICAL blocks the merge or deploy, fixable HIGH is reported but does not block. Actions are pinned to major tags, not commit SHAs.
 10. **Not penetration tested.** The app was exercised in a real browser (Edge, 43 checks, see below), but that is a functional check, not a penetration test.
 11. **Privacy/compliance:** account deletion and data export now exist (M10). Not covered: copies of the data in backups you made earlier, and anything already sent to Google (the grant is revoked, mail stays at Google). AI consent exists (off by default) but no AI feature exists yet, and the gate only works if every future AI feature calls it.
 12. **Rate limiting** is per client IP, now the real client address behind the proxy. It was not load-tested. On Docker Desktop the client appears as the Docker gateway address (172.28.0.1), so all local requests share one limit.

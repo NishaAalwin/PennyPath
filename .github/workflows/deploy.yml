@@ -1,0 +1,181 @@
+name: Deploy
+
+# Every push to main that passes CI is built, scanned and deployed to the Azure VM (decision: brain/requirements/
+# Constraints and decisions.md #3). To roll back, run this workflow by hand on main with an earlier commit's SHA.
+#
+# Needs these repository variables (not secrets; printed by the Bicep deployment, see docs/operations.md section 11):
+#   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP, AZURE_VM_NAME,
+#   AZURE_KEY_VAULT_NAME, SITE_ADDRESS
+# Until AZURE_CLIENT_ID is set, images are still built, scanned and pushed but the deploy job is skipped.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      rollback_sha:
+        description: "Redeploy an earlier commit's images (full 40-character SHA). Empty = build and deploy the current main."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+# One deploy at a time; a queued deploy waits for the running one instead of cancelling it half-way.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    outputs:
+      sha: ${{ steps.p.outputs.sha }}
+      build: ${{ steps.p.outputs.build }}
+      prefix: ${{ steps.p.outputs.prefix }}
+      go: ${{ steps.p.outputs.go }}
+    steps:
+      - id: p
+        env:
+          ROLLBACK_SHA: ${{ inputs.rollback_sha }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "prefix=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          if [ -n "$ROLLBACK_SHA" ]; then
+            [[ "$ROLLBACK_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::rollback_sha must be a full 40-character commit SHA"; exit 1; }
+            printf 'sha=%s\nbuild=false\ngo=true\n' "$ROLLBACK_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          sha="${RUN_SHA:-$GITHUB_SHA}"
+          printf 'sha=%s\nbuild=true\n' "$sha" >> "$GITHUB_OUTPUT"
+          # CI runs can finish out of order. If main has already moved on, the newer commit's own run deploys it, so
+          # never put this older commit over it.
+          tip="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          if [ "$tip" != "$sha" ]; then
+            echo "::notice::main is now at $tip; skipping the deploy of older commit $sha"
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  images:
+    needs: plan
+    if: needs.plan.outputs.go == 'true' && needs.plan.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      SHA: ${{ needs.plan.outputs.sha }}
+      PREFIX: ${{ needs.plan.outputs.prefix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+
+      - name: Build images
+        run: |
+          label="org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}"
+          docker build --pull --label "$label" -t "$PREFIX-api:$SHA" backend
+          # The page and the API share one origin behind the proxy, so the API URL is empty (relative).
+          docker build --pull --label "$label" --build-arg VITE_API_URL= -t "$PREFIX-web:$SHA" frontend
+          docker build --pull --label "$label" -t "$PREFIX-proxy:$SHA" proxy
+
+      - name: Scan images (report HIGH, block fixable CRITICAL)
+        env:
+          FAIL_ON: CRITICAL
+        run: bash scripts/scan-images.sh "$PREFIX-api:$SHA" "$PREFIX-web:$SHA" "$PREFIX-proxy:$SHA"
+
+      - name: Push images
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          for s in api web proxy; do docker push "$PREFIX-$s:$SHA"; done
+          docker logout ghcr.io
+
+  deploy:
+    needs: [plan, images]
+    if: >-
+      always() && needs.plan.result == 'success' && needs.plan.outputs.go == 'true' && vars.AZURE_CLIENT_ID != '' &&
+      (needs.images.result == 'success' || (needs.images.result == 'skipped' && needs.plan.outputs.build == 'false'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://${{ vars.SITE_ADDRESS }}
+    permissions:
+      contents: read
+      id-token: write # OIDC sign-in to Azure; no Azure secret is stored in GitHub
+      packages: read # lets the VM pull the images with this job's short-lived token
+    env:
+      SHA: ${{ needs.plan.outputs.sha }}
+      PREFIX: ${{ needs.plan.outputs.prefix }}
+      SITE_ADDRESS: ${{ vars.SITE_ADDRESS }}
+      KEY_VAULT_NAME: ${{ vars.AZURE_KEY_VAULT_NAME }}
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      VM_NAME: ${{ vars.AZURE_VM_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Assemble the script for the VM
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          umask 077
+          {
+            echo '#!/bin/bash'
+            echo 'set -euo pipefail'
+            echo 'install -d -m 0700 /opt/pennypath && cd /opt/pennypath'
+            for f in docker-compose.yml docker-compose.prod.yml; do
+              printf "base64 -d > %s <<'B64'\n" "$f"
+              base64 -w0 "$f"
+              printf '\nB64\n'
+            done
+            printf 'export IMAGE_PREFIX=%q IMAGE_TAG=%q SITE_ADDRESS=%q KEY_VAULT_NAME=%q GHCR_USER=%q GHCR_TOKEN=%q\n' \
+              "$PREFIX" "$SHA" "$SITE_ADDRESS" "$KEY_VAULT_NAME" "$GITHUB_ACTOR" "$GHCR_TOKEN"
+            cat scripts/azure/vm-deploy.sh
+          } > "$RUNNER_TEMP/run.sh"
+
+      - name: Deploy on the VM (Azure Run Command)
+        run: |
+          trap 'rm -f "$RUNNER_TEMP/run.sh"' EXIT
+          az vm run-command invoke -g "$RESOURCE_GROUP" -n "$VM_NAME" --command-id RunShellScript \
+            --scripts @"$RUNNER_TEMP/run.sh" -o json > "$RUNNER_TEMP/result.json"
+          jq -r '.value[].message' "$RUNNER_TEMP/result.json"
+          # Run Command reports success even when the script fails, so look for the script's own success line.
+          if ! jq -r '.value[].message' "$RUNNER_TEMP/result.json" | grep -q "PENNYPATH_DEPLOY_OK $SHA"; then
+            echo "::error::The deploy script on the VM did not finish; the previous containers keep running where compose did not replace them."
+            exit 1
+          fi
+
+      - name: Check the public health endpoint
+        run: |
+          # The first deploy waits for Caddy to get a Let's Encrypt certificate.
+          for _ in $(seq 1 30); do
+            body="$(curl -fsS --max-time 10 "https://$SITE_ADDRESS/api/health" 2>/dev/null || true)"
+            if [ "$(jq -r '.database' <<<"$body" 2>/dev/null)" = true ]; then
+              echo "Healthy: $body"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::https://$SITE_ADDRESS/api/health did not report a reachable database within 5 minutes"
+          exit 1

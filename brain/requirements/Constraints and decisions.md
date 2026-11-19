@@ -16,7 +16,7 @@ India, INR, UPI (open decision).
 ## Open decisions
 1. Country/currency focus confirmation
 2. Android: React Native vs Kotlin
-3. Hosting: Azure / AWS / VPS
+3. ~~Hosting: Azure / AWS / VPS~~ **Decided 2026-11-19 (user):** one Azure Linux VM (Central India) running the existing `docker compose` stack; Azure resources defined in **Bicep** under `infra/`; **every push to `main` deploys** once CI passes (no manual approval). GitHub signs in to Azure with OIDC (no stored Azure secret); app secrets live in Azure Key Vault; images stay on GHCR. See [[M8 Docker and CI]].
 4. MVP audience: author + ≤ 100 Gmail test users (recommended) vs public launch (needs Google verification and audit)
 5. Move the Android SMS app (C1) earlier than v0.3? Pasting SMS weakens the "no manual logging" promise
 6. Do investment ideas (S1) fall under SEBI investment-advice rules? Check before building S1
