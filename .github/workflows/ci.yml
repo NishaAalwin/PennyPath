@@ -1,43 +1,113 @@
 name: CI
 
+# Runs on every pull request and every push to main. A green run on a push to main starts deploy.yml, which builds,
+# scans and deploys that commit to the Azure VM (brain/requirements/M8 Docker and CI.md).
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its older run; every commit on main gets its own run (deploy needs each result).
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
 
 jobs:
   backend:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
       - run: dotnet restore backend/PennyPath.sln
       - run: dotnet build backend/PennyPath.sln -c Release --no-restore
       - run: dotnet test backend/PennyPath.sln -c Release --no-build
+      - name: Fail on known-vulnerable NuGet packages
+        run: |
+          dotnet list backend/PennyPath.sln package --vulnerable --include-transitive | tee vuln.txt
+          if grep -q "has the following vulnerable packages" vuln.txt; then exit 1; fi
 
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm audit --audit-level=high
       - run: npm run lint
       - run: npm test
       - run: npm run build
 
+  # Checks the deployment files themselves, so a broken workflow, script, template or compose file fails the PR and
+  # not the deploy after merge.
+  infra:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Lint workflows (actionlint, with shellcheck on run blocks)
+        run: |
+          docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:1.7.7 -no-color
+
+      - name: Lint shell scripts (shellcheck)
+        run: |
+          docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.10.0 \
+            scripts/backup.sh scripts/restore.sh scripts/scan-images.sh scripts/azure/vm-deploy.sh
+
+      - name: Build and lint the Bicep template
+        run: |
+          az bicep install
+          az bicep build --file infra/main.bicep --stdout > /dev/null
+
+      - name: Validate the compose files (local and production)
+        env:
+          # Placeholders only, so compose can resolve the file; nothing is started.
+          POSTGRES_PASSWORD: ci-placeholder
+          JWT_KEY: ci-placeholder-ci-placeholder-ci-placeholder
+          IMAGE_PREFIX: ghcr.io/example/pennypath
+          IMAGE_TAG: "0000000000000000000000000000000000000000"
+          SITE_ADDRESS: example.invalid
+        run: |
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet
+
+  # Builds the images exactly as deploy.yml does and scans them with the same rule, so a vulnerable base image is
+  # caught on the pull request.
   docker:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t pennypath-api backend
-      - run: docker build -t pennypath-web frontend
+        with:
+          persist-credentials: false
+      - name: Build images
+        run: |
+          docker build --pull -t pennypath-api backend
+          docker build --pull --build-arg VITE_API_URL= -t pennypath-web frontend
+          docker build --pull -t pennypath-proxy proxy
+      - name: Scan images (report HIGH, block fixable CRITICAL)
+        env:
+          FAIL_ON: CRITICAL
+        run: bash scripts/scan-images.sh pennypath-api pennypath-web pennypath-proxy

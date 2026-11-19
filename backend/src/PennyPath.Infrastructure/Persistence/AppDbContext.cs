@@ -7,6 +7,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
+    public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<GmailConnection> GmailConnections => Set<GmailConnection>();
+    public DbSet<GmailOAuthState> GmailOAuthStates => Set<GmailOAuthState>();
+    public DbSet<UserToken> UserTokens => Set<UserToken>();
+    public DbSet<RecoveryCode> RecoveryCodes => Set<RecoveryCode>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -18,11 +24,72 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(u => u.PasswordHash).IsRequired();
         });
 
+        b.Entity<Session>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.UserId);
+        });
+
+        b.Entity<AuditEvent>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Type).HasMaxLength(40).IsRequired();
+            e.Property(x => x.Ip).HasMaxLength(AuditEvent.MaxIpLength);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.UserId, x.At });
+            e.HasIndex(x => x.At);
+        });
+
+        b.Entity<UserToken>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Purpose).HasMaxLength(20).IsRequired();
+            e.Property(x => x.TokenHash).HasMaxLength(64).IsRequired();
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.TokenHash).IsUnique();
+            e.HasIndex(x => new { x.UserId, x.Purpose, x.CreatedAt });
+        });
+
+        b.Entity<RecoveryCode>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.CodeHash).HasMaxLength(64).IsRequired();
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.UserId, x.CodeHash });
+        });
+
+        b.Entity<GmailConnection>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.ProtectedRefreshToken).IsRequired();
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.UserId).IsUnique(); // one Gmail account per user
+        });
+
+        b.Entity<GmailOAuthState>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.StateHash).HasMaxLength(64).IsRequired();
+            e.Property(x => x.ProtectedCodeVerifier).IsRequired();
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.StateHash).IsUnique();
+        });
+
         b.Entity<Transaction>(e =>
         {
             e.HasKey(t => t.Id);
             e.Property(t => t.Amount).HasPrecision(18, 2);
             e.Property(t => t.Merchant).HasMaxLength(200);
+            e.Property(t => t.Category).HasMaxLength(100);
+            e.Property(t => t.RawHash).HasMaxLength(64).IsRequired();
+            e.Property(t => t.Type).HasConversion<string>().HasMaxLength(10);
+            e.Property(t => t.Source).HasConversion<string>().HasMaxLength(10);
+            e.HasOne<User>().WithMany().HasForeignKey(t => t.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(t => new { t.UserId, t.RawHash }).IsUnique();
+            e.HasIndex(t => new { t.UserId, t.Date });
+            e.HasIndex(t => new { t.UserId, t.Amount, t.Date });
         });
+
     }
 }

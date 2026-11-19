@@ -1,47 +1,175 @@
+using System.Net;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using PennyPath.Api.Email;
+using PennyPath.Api.Security;
+using PennyPath.Application.Account;
 using PennyPath.Application.Auth;
+using PennyPath.Application.Categorization;
+using PennyPath.Application.Gmail;
+using PennyPath.Application.Parsing;
+using PennyPath.Application.Security;
+using PennyPath.Application.Transactions;
+using PennyPath.Infrastructure.Account;
 using PennyPath.Infrastructure.Auth;
+using PennyPath.Infrastructure.Email;
+using PennyPath.Infrastructure.Gmail;
 using PennyPath.Infrastructure.Persistence;
+using PennyPath.Infrastructure.Security;
+using PennyPath.Infrastructure.Transactions;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var jwt = builder.Configuration.GetSection(JwtOptions.Section).Get<JwtOptions>() ?? new JwtOptions();
 if (Encoding.UTF8.GetByteCount(jwt.Key) < 32)
     throw new InvalidOperationException("Jwt:Key must be set to a secret of at least 32 bytes (use the Jwt__Key environment variable).");
+if (!builder.Environment.IsDevelopment() && jwt.Key.Contains("dev-only", StringComparison.OrdinalIgnoreCase))
+    throw new InvalidOperationException("Jwt:Key is a development placeholder; set a real secret outside Development.");
 
-builder.Services.AddControllers();
+builder.WebHost.ConfigureKestrel(o =>
+{
+    o.AddServerHeader = false;
+    o.Limits.MaxRequestBodySize = 1_000_000; // 1 MB: an import of 500 messages is far smaller
+});
+
+builder.Services.AddControllers()
+    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddOpenApi();
 builder.Services.AddDbContext<AppDbContext>(o =>
     o.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.Section));
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.Section));
+builder.Services.Configure<AppOptions>(builder.Configuration.GetSection(AppOptions.Section));
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.Section));
+builder.Services.AddScoped<IMfaVerifier, MfaVerifier>();
+builder.Services.AddScoped<IAccountService, AccountService>();
+// Email is queued and sent in the background, so a slow mail server cannot slow or reveal anything about a request.
+builder.Services.AddSingleton<QueuedEmailSender>();
+builder.Services.AddSingleton<IEmailSender>(sp => sp.GetRequiredService<QueuedEmailSender>());
+builder.Services.AddSingleton<IEmailTransport, SmtpEmailTransport>();
+builder.Services.AddHostedService<EmailDispatcher>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IAuditLog, AuditLog>();
+builder.Services.AddScoped<IAiConsent, AiConsentService>();
+builder.Services.AddSingleton(new SessionCookieSettings(builder.Configuration.GetValue("Auth:CookieSecure", true)));
+
+// Key ring for encrypting stored secrets (e.g. Gmail tokens). It must survive restarts and redeploys, or every
+// stored secret becomes unreadable; outside Development it has to be configured on persistent storage.
+var dataProtection = builder.Services.AddDataProtection().SetApplicationName("PennyPath");
+var keysPath = builder.Configuration["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(keysPath)) dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keysPath));
+else if (!builder.Environment.IsDevelopment())
+    throw new InvalidOperationException("DataProtection:KeysPath must point at persistent storage outside Development.");
+builder.Services.AddSingleton<ITokenProtector, DataProtectionTokenProtector>();
+builder.Services.AddSingleton<ITransactionParser, SmsTransactionParser>();
+builder.Services.AddSingleton<ICategorizer, RuleCategorizer>();
+builder.Services.AddScoped<ITransactionService, TransactionService>();
+
+// Gmail import. Without Google:ClientId / ClientSecret / RedirectUri (environment variables) the feature reports "not set up".
+builder.Services.Configure<GoogleOptions>(builder.Configuration.GetSection(GoogleOptions.Section));
+builder.Services.AddHttpClient<IGoogleApi, GoogleHttpApi>(c => c.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddScoped<IGmailService, GmailService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(o => o.TokenValidationParameters = new TokenValidationParameters
+    .AddJwtBearer(o =>
     {
-        ValidIssuer = jwt.Issuer,
-        ValidAudience = jwt.Audience,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)),
-        ClockSkew = TimeSpan.FromSeconds(30),
+        o.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidIssuer = jwt.Issuer,
+            ValidAudience = jwt.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)),
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256], // refuse "none" and algorithm-confusion tokens
+            RequireExpirationTime = true,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+        };
+        o.Events = new JwtBearerEvents
+        {
+            // The browser sends the token in the HttpOnly cookie; an explicit Authorization header still works for other clients.
+            OnMessageReceived = ctx =>
+            {
+                if (!ctx.Request.Headers.ContainsKey("Authorization")
+                    && ctx.Request.Cookies.TryGetValue(ctx.HttpContext.RequestServices.GetRequiredService<SessionCookieSettings>().Name, out var t))
+                {
+                    ctx.Token = t;
+                    ctx.HttpContext.Items[CsrfProtectionMiddleware.CookieAuthItem] = true;
+                }
+                return Task.CompletedTask;
+            },
+            // A valid signature is not enough: the session behind the token must still be active (logout revokes it).
+            OnTokenValidated = async ctx =>
+            {
+                var ok = Guid.TryParse(ctx.Principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)
+                    & Guid.TryParse(ctx.Principal?.FindFirstValue(JwtRegisteredClaimNames.Jti), out var sessionId);
+                if (ok)
+                {
+                    var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                    var now = ctx.HttpContext.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime;
+                    var verified = await (from s in db.Sessions
+                                          join u in db.Users on s.UserId equals u.Id
+                                          where s.Id == sessionId && s.UserId == userId && s.RevokedAt == null && s.ExpiresAt > now
+                                          select (bool?)u.EmailVerified).FirstOrDefaultAsync(ctx.HttpContext.RequestAborted);
+                    ok = verified is not null;
+                    // Whether the email is verified comes from the database on every request, never from the token.
+                    if (ok) ((ClaimsIdentity)ctx.Principal!.Identity!).AddClaim(new Claim("email_verified", verified == true ? "true" : "false"));
+                }
+                if (!ok) ctx.Fail("The session has ended.");
+            },
+        };
     });
-builder.Services.AddAuthorization();
+// Every [Authorize] needs a verified email by default; only the few account endpoints named "Authenticated" do not.
+builder.Services.AddAuthorization(o =>
+{
+    o.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder().RequireAuthenticatedUser().RequireClaim("email_verified", "true").Build();
+    o.AddPolicy("Authenticated", p => p.RequireAuthenticatedUser());
+});
+
+static string ClientKey(HttpContext ctx) => ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    // Everything: generous per-IP ceiling. Auth endpoints: much stricter (brute force / credential stuffing).
+    o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientKey(ctx),
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 300, Window = TimeSpan.FromMinutes(1) }));
+    // Gmail endpoints reach out to Google, so they get a tight ceiling as well.
+    o.AddPolicy("gmail", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ClientKey(ctx),
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1) }));
+    o.AddPolicy("account", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ClientKey(ctx),
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) }));
     o.AddPolicy("auth", ctx => RateLimitPartition.GetFixedWindowLimiter(
-        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        ClientKey(ctx),
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) }));
 });
 
+// Trust X-Forwarded-* only from proxies you list; otherwise rate limits would key on the proxy's IP.
+var proxies = builder.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [];
+if (proxies.Length > 0)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(o =>
+    {
+        o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        o.ForwardLimit = 1;
+        foreach (var p in proxies) o.KnownProxies.Add(IPAddress.Parse(p));
+    });
+}
+
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     .WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [])
-    .AllowAnyHeader().AllowAnyMethod()));
+    .WithHeaders("Authorization", "Content-Type")
+    .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")));
 
 var app = builder.Build();
 
@@ -51,7 +179,25 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
     scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
 }
 
-if (app.Environment.IsDevelopment())
+if (proxies.Length > 0) app.UseForwardedHeaders();
+
+app.Use(async (ctx, next) =>
+{
+    var h = ctx.Response.Headers;
+    h["X-Content-Type-Options"] = "nosniff";
+    h["X-Frame-Options"] = "DENY";
+    h["Referrer-Policy"] = "no-referrer";
+    h["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
+    h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    h["Cache-Control"] = "no-store"; // responses hold personal financial data
+    await next();
+});
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts(); // only emitted over HTTPS; TLS itself is terminated by the reverse proxy
+}
+else
 {
     app.MapOpenApi();
 }
@@ -59,6 +205,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors();
 app.UseRateLimiter();
 app.UseAuthentication();
+app.UseMiddleware<CsrfProtectionMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 

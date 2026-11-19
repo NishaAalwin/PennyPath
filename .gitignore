@@ -5,3 +5,6 @@ dist/
 .env
 *.user
 .vs/
+
+# Encrypted backups (still do not commit them)
+backups/

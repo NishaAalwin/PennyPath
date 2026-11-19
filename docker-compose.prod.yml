@@ -1,0 +1,33 @@
+# Production overrides for the Azure VM, used on top of docker-compose.yml. On the VM, /opt/pennypath/.env sets
+# COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml, so plain `docker compose ...` there uses both files.
+#
+# Differences from local: images come from GHCR at the commit being deployed (never built on the server), the proxy
+# listens on the public ports 80 and 443 for SITE_ADDRESS (Let's Encrypt certificate), its Caddyfile is baked into the
+# image, and every service restarts after a crash or a VM reboot. Postgres and Mailpit stay on loopback only.
+services:
+  db:
+    restart: unless-stopped
+
+  api:
+    build: !reset null
+    image: ${IMAGE_PREFIX:?Set IMAGE_PREFIX}-api:${IMAGE_TAG:?Set IMAGE_TAG}
+    restart: unless-stopped
+
+  mailpit:
+    restart: unless-stopped
+
+  web:
+    build: !reset null
+    image: ${IMAGE_PREFIX:?Set IMAGE_PREFIX}-web:${IMAGE_TAG:?Set IMAGE_TAG}
+    restart: unless-stopped
+
+  proxy:
+    build: !reset null
+    image: ${IMAGE_PREFIX:?Set IMAGE_PREFIX}-proxy:${IMAGE_TAG:?Set IMAGE_TAG}
+    restart: unless-stopped
+    ports: !override
+      - "80:80"   # Let's Encrypt HTTP challenge and redirect to HTTPS
+      - "443:443"
+    volumes: !override
+      - caddy_data:/data
+      - caddy_config:/config
