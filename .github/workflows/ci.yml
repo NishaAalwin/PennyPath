@@ -86,7 +86,7 @@ jobs:
           POSTGRES_PASSWORD: ci-placeholder
           JWT_KEY: ci-placeholder-ci-placeholder-ci-placeholder
           IMAGE_PREFIX: ghcr.io/example/pennypath
-          IMAGE_TAG: 0000000000000000000000000000000000000000
+          IMAGE_TAG: "0000000000000000000000000000000000000000"
           SITE_ADDRESS: example.invalid
         run: |
           docker compose -f docker-compose.yml config --quiet
